@@ -1,5 +1,5 @@
 /* ============================================================
-   yallaakora - إثراء البيانات الحية
+   yallaakora - إثراء البيانات الحية (نسخة مع تخزين مؤقت)
    ------------------------------------------------------------
    1) شعارات الفرق من TheSportsDB (أثبت من صور ESPN اللي بتتكسر)
    2) قناة البث الرسمية لكل مباراة من TheSportsDB / eventstv
@@ -10,6 +10,8 @@
   "use strict";
 
   const TSDB = "https://www.thesportsdb.com/api/v1/json/123/";
+  const CACHE_KEY = "kora_enrich_v2";
+  const TTL = { badge: 24 * 3600e3, tv: 60 * 60e3, weather: 30 * 60e3 };
   const LEAGUES = {
     "eng.1": "English Premier League",
     "esp.1": "Spanish La Liga",
@@ -34,7 +36,7 @@
 
   async function get(url) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const timer = setTimeout(() => ctrl.abort(), 7000);
     try {
       const r = await fetch(url, { signal: ctrl.signal, headers: { Accept: "application/json" } });
       if (!r.ok) throw new Error("HTTP " + r.status);
@@ -57,7 +59,7 @@
     return (2 * hit) / (a.length + b.length);
   }
   function best(needle, pool, pick) {
-    if (!needle.length) return null;
+    if (!needle.length || !pool.length) return null;
     const k = tkey(needle);
     for (const item of pool) { if (tkey(item.tokens) === k) return pick(item); }
     let winner = null, top = 0.62;
@@ -84,6 +86,14 @@
     95: "عاصفة", 96: "عاصفة", 99: "عاصفة"
   };
 
+  function readCache() {
+    try { return JSON.parse(localStorage.getItem(CACHE_KEY) || "{}"); } catch (_) { return {}; }
+  }
+  function writeCache(c) {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch (_) {}
+  }
+  const fresh = (ts, ttl) => !!ts && (Date.now() - ts < ttl);
+
   async function load(data) {
     const usedKeys = new Set();
     ["yesterday", "today", "tomorrow"].forEach((d) =>
@@ -91,35 +101,46 @@
     );
     if (data.live && data.live.leagueKey) usedKeys.add(data.live.leagueKey);
 
-    /* 1) شعارات الفرق */
-    const leagueKeys = Object.keys(LEAGUES).filter((k) => usedKeys.has(k));
-    const teamRequests = await Promise.allSettled(leagueKeys.map((k) =>
-      get(TSDB + "search_all_teams.php?l=" + encodeURIComponent(LEAGUES[k]))
-    ));
-    const badgePool = [];
-    teamRequests.forEach((res) => {
-      (res.status === "fulfilled" && res.value.teams || []).forEach((t) => {
-        if (t.strBadge) badgePool.push({ tokens: tokens(t.strTeam), badge: t.strBadge });
-      });
-    });
-    const badgeOf = (name) => best(tokens(name), badgePool, (x) => x.badge);
+    const cache = readCache();
+    let changed = false;
 
-    /* 2) قنوات البث الرسمية */
-    const tvRequests = await Promise.allSettled([-1, 0, 1].map((o) =>
-      get(TSDB + "eventstv.php?d=" + day(o) + "&s=Soccer")
-    ));
-    const tvPool = [];
-    tvRequests.forEach((res) => {
-      (res.status === "fulfilled" && res.value.tvevents || []).forEach((e) => {
-        const parts = String(e.strEvent || "").split(/\s+vs\.?\s+/i);
-        if (parts.length < 2) return;
-        tvPool.push({
-          home: tokens(parts[0]), away: tokens(parts[1]),
-          channel: e.strChannel || "", country: e.strCountry || "",
-          logo: e.strLogo || "", time: e.strTime || ""
+    /* 1) شعارات الفرق */
+    if (!fresh(cache.badgeTs, TTL.badge) || !cache.badges || !cache.badges.length) {
+      const leagueKeys = Object.keys(LEAGUES).filter((k) => usedKeys.has(k));
+      const res = await Promise.allSettled(leagueKeys.map((k) =>
+        get(TSDB + "search_all_teams.php?l=" + encodeURIComponent(LEAGUES[k]))
+      ));
+      const pool = [];
+      res.forEach((r) => {
+        (r.status === "fulfilled" && r.value.teams || []).forEach((t) => {
+          if (t.strBadge) pool.push({ tokens: tokens(t.strTeam), badge: t.strBadge });
         });
       });
-    });
+      if (pool.length) { cache.badges = pool; cache.badgeTs = Date.now(); changed = true; }
+    }
+    const badgePool = cache.badges || [];
+    const badgeOf = (name) => best(tokens(name), badgePool, (x) => x.badge);
+
+    /* 2) قنوات البث الرسمية (يومان فقط لتقليل الضغط على المزوّد) */
+    if (!fresh(cache.tvTs, TTL.tv) || !cache.tv) {
+      const res = await Promise.allSettled([0, 1].map((o) =>
+        get(TSDB + "eventstv.php?d=" + day(o) + "&s=Soccer")
+      ));
+      const pool = [];
+      res.forEach((r) => {
+        (r.status === "fulfilled" && r.value.tvevents || []).forEach((e) => {
+          const parts = String(e.strEvent || "").split(/\s+vs\.?\s+/i);
+          if (parts.length < 2) return;
+          pool.push({
+            home: tokens(parts[0]), away: tokens(parts[1]),
+            channel: e.strChannel || "", country: e.strCountry || "",
+            logo: e.strLogo || "", time: e.strTime || ""
+          });
+        });
+      });
+      cache.tv = pool; cache.tvTs = Date.now(); changed = true;
+    }
+    const tvPool = cache.tv || [];
     const tvOf = (home, away) => {
       const h = tokens(home), a = tokens(away);
       if (!h.length || !a.length) return null;
@@ -133,21 +154,22 @@
 
     /* 3) طقس كل بطولة مستخدمة */
     const cityKeys = [...usedKeys].filter((k) => CITIES[k]);
-    const weatherRequests = await Promise.allSettled(cityKeys.map((k) => {
-      const c = CITIES[k];
-      return get("https://api.open-meteo.com/v1/forecast?latitude=" + c[0] + "&longitude=" + c[1] +
-        "&current=temperature_2m,weather_code&timezone=auto");
-    }));
-    const weather = {};
-    cityKeys.forEach((k, i) => {
-      const r = weatherRequests[i];
-      if (r.status !== "fulfilled" || !r.value.current) return;
-      const code = r.value.current.weather_code;
-      weather[k] = {
-        temp: Math.round(r.value.current.temperature_2m),
-        desc: WEATHER[code] || "طقس معتدل"
-      };
-    });
+    if (!fresh(cache.weatherTs, TTL.weather) || !cache.weather) {
+      const res = await Promise.allSettled(cityKeys.map((k) => {
+        const c = CITIES[k];
+        return get("https://api.open-meteo.com/v1/forecast?latitude=" + c[0] + "&longitude=" + c[1] +
+          "&current=temperature_2m,weather_code&timezone=auto");
+      }));
+      const w = {};
+      cityKeys.forEach((k, i) => {
+        const r = res[i];
+        if (r.status !== "fulfilled" || !r.value.current) return;
+        const code = r.value.current.weather_code;
+        w[k] = { temp: Math.round(r.value.current.temperature_2m), desc: WEATHER[code] || "طقس معتدل" };
+      });
+      if (Object.keys(w).length) { cache.weather = w; cache.weatherTs = Date.now(); changed = true; }
+    }
+    if (changed) writeCache(cache);
 
     /* تطبيق النتائج */
     Object.keys(data.teams || {}).forEach((id) => {
@@ -159,7 +181,7 @@
       const h = (data.teams[m.home] || {}).rawName || "";
       const a = (data.teams[m.away] || {}).rawName || "";
       m.tv = tvOf(m.homeRaw || h, m.awayRaw || a);
-      m.weather = weather[m.leagueKey] || null;
+      m.weather = (cache.weather || {})[m.leagueKey] || null;
     };
     ["yesterday", "today", "tomorrow"].forEach((d) =>
       (data.matches && data.matches[d] || []).forEach(decorate)

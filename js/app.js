@@ -701,9 +701,13 @@
   function renderScoreTicker() {
     const el = document.getElementById("scoreTicker");
     if (!el) return;
-    const list = (D.matches && D.matches.today || []).slice(0, 12);
+    const list = [
+      ...((D.matches && D.matches.yesterday) || []),
+      ...((D.matches && D.matches.today) || []),
+      ...((D.matches && D.matches.tomorrow) || [])
+    ].slice(0, 14);
     el.innerHTML = `<div class="container ticker-inner">
-      <span class="ticker-label"><span class="live-dot"></span> نتائج اليوم</span>
+      <span class="ticker-label"><span class="live-dot"></span> لوحة المباريات</span>
       <div class="ticker-scroll">${list.map((m) => {
         const h = D.teams[m.home] || {}, aw = D.teams[m.away] || {};
         return `<button class="ticker-item ${m.status === "live" ? "is-live" : ""}" data-action="match" data-id="${esc(m.id)}">

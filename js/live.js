@@ -95,6 +95,7 @@
     sourceNames.push(english);
     teams[id] = {
       name: english,
+      rawName: english,
       code: comp.team.abbreviation || english.slice(0, 2),
       c1: "#" + String(comp.team.color || "334155").replace("#", ""),
       c2: textColor(comp.team.color),
@@ -126,6 +127,8 @@
           league: leagueLabel,
           home: hid,
           away: aid,
+          homeRaw: teams[hid].rawName,
+          awayRaw: teams[aid].rawName,
           hs: homeC.score != null ? homeC.score : "-",
           as: awayC.score != null ? awayC.score : "-",
           time: timeOf(ev.date),
@@ -288,6 +291,7 @@
     return {
       id: live.id,
       league: live.league,
+      leagueKey: live.leagueKey,
       home: live.home, away: live.away,
       hs: live.hs, as: live.as,
       minute: live.minute || "الآن",
@@ -371,6 +375,7 @@
       live: liveData ? {
         id: liveData.id,
         league: liveData.league,
+        leagueKey: liveData.leagueKey,
         home: liveData.home,
         away: liveData.away,
         hs: liveData.hs,

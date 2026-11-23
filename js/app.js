@@ -67,7 +67,7 @@
   const badge = (team, cls) => {
     const t = typeof team === "string" ? D.teams[team] : team;
     if (!t) return "";
-    return `<span class="team-badge ${cls || ""}" style="--c1:${t.c1};--c2:${t.c2}">${esc(t.code)}</span>`;
+    return `<span class="team-badge ${cls || ""}" style="--c1:${t.c1};--c2:${t.c2}">${t.logo ? `<img class="badge-img" src="${esc(t.logo)}" alt="" loading="lazy" onerror="this.remove()">` : ""}<span class="badge-code">${esc(t.code)}</span></span>`;
   };
 
   const num = (n) => new Intl.NumberFormat("ar-EG").format(n);
@@ -588,6 +588,17 @@
     return null;
   }
 
+  function matchExtras(m) {
+    const bits = [];
+    if (m.weather) {
+      bits.push(`<div class="match-extra"><span class="ex-ico">🌡️</span><div class="ex-txt"><b>طقس المباراة</b><span>${esc(m.weather.temp)}° · ${esc(m.weather.desc)}</span></div></div>`);
+    }
+    if (m.tv) {
+      bits.push(`<div class="match-extra">${m.tv.logo ? `<img class="ex-logo" src="${esc(m.tv.logo)}" alt="" loading="lazy" onerror="this.remove()">` : `<span class="ex-ico">📺</span>`}<div class="ex-txt"><b>قناة البث الرسمية</b><span>${esc(m.tv.channel || "قناة رسمية")}${m.tv.country ? " · " + esc(m.tv.country) : ""}</span></div></div>`);
+    }
+    return bits.length ? `<div class="match-extras">${bits.join("")}</div>` : "";
+  }
+
   function showMatch(id) {
     const m = findMatch(id);
     if (!m) return;
@@ -605,6 +616,7 @@
         <p>الحالة: ${m.status === "live" ? "مباشر الآن" : m.status === "finished" ? "انتهت المباراة" : "لم تبدأ بعد"}</p>
         <p>البطولة: ${esc(m.league)}</p>
       </div>
+      ${matchExtras(m)}
       <button class="vote-btn" data-action="rate-player" style="margin-top:14px">اختر رجل المباراة</button>
       ${m.link ? `<a class="vote-btn" style="display:block;text-align:center;margin-top:10px;text-decoration:none" href="${esc(m.link)}" target="_blank" rel="noopener">المشاهدة الرسمية / المصدر ↗</a>` : `<p class="modal-note" style="margin-top:10px">المشاهدة الكاملة تخضع لحقوق النقل.</p>`}`, "تفاصيل المباراة");
   }
@@ -726,22 +738,26 @@
   }
 
   /* ---------- تحديث البيانات الحية ---------- */
-  function refreshLive(showToast) {
+  async function refreshLive(showToast) {
     if (!window.KORA_LIVE) return;
     const status = document.getElementById("dataStatus");
     status.textContent = "جارٍ التحديث...";
-    window.KORA_LIVE.load().then((data) => {
+    try {
+      let data = await window.KORA_LIVE.load();
+      if (window.KORA_ENRICH) {
+        try { data = await window.KORA_ENRICH.load(data); } catch (err) { console.warn("Enrichment unavailable:", err); }
+      }
       D = data;
       status.classList.remove("error");
       status.textContent = "بيانات حية · " + new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
       route();
       if (showToast) toast("تم تحديث البيانات من المصدر الحي");
-    }).catch((err) => {
+    } catch (err) {
       status.textContent = "بيانات تجريبية";
       status.classList.add("error");
       if (showToast) toast("تعذر تحديث البيانات، يتم عرض النسخة التجريبية");
       console.warn("Live data unavailable:", err);
-    });
+    }
   }
 
   /* محاكاة الدقيقة فقط في الوضع التجريبي */

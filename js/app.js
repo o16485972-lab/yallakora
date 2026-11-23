@@ -652,8 +652,9 @@
   }
 
   async function findLineupEvent(m) {
-    const h = String(m.homeRaw || (D.teams[m.home] || {}).name || "");
-    const a = String(m.awayRaw || (D.teams[m.away] || {}).name || "");
+    const ht = D.teams[m.home] || {}, at = D.teams[m.away] || {};
+    const h = String(m.homeRaw || ht.rawName || ht.name || "");
+    const a = String(m.awayRaw || at.rawName || at.name || "");
     const queries = [h + " vs " + a, a + " vs " + h, h, a].filter((q) => q.trim());
     for (const q of queries) {
       try {
@@ -698,7 +699,7 @@
       store.set(key, rows);
       box.innerHTML = lineupHTML(m, rows);
     } catch (err) {
-      console.warn("Lineup unavailable:", m.homeRaw, m.awayRaw, err);
+      console.warn("Lineup unavailable:", { id: m.id, home: m.home, away: m.away, homeRaw: m.homeRaw, awayRaw: m.awayRaw, teams: [D.teams[m.home], D.teams[m.away]] }, err);
       box.innerHTML = `<p class="modal-note">التشكيلات غير متوفرة لهذه المباراة في مصدر البيانات حالياً.</p>`;
     }
   }

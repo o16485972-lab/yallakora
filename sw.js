@@ -18,16 +18,21 @@ if (FCM_SENDER) {
   } catch (err) { /* FCM غير متاح بدون بيانات صحيحة */ }
 }
 
-const CACHE = "kora-v25";
+/* Cloudflare Worker للإشعارات في الخلفية — يُمرَّر في رابط التسجيل */
+const WORKER_URL = FCM_Q.get("worker") || "";
+
+const CACHE = "kora-v26";
 const SHELL = [
   "./", "./index.html", "./manifest.json", "./icon.svg",
-  "./css/styles.css?v=15", "./js/config.js?v=2", "./js/data.js?v=3",
+  "./css/styles.css?v=15", "./js/config.js?v=3", "./js/data.js?v=3",
   "./js/streams.js", "./js/sources.js?v=2", "./js/live.js?v=3",
-  "./js/enrich.js?v=6", "./js/app.js?v=25"
+  "./js/enrich.js?v=6", "./js/app.js?v=26"
 ];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE)
+    .then((c) => c.addAll(SHELL).then(() => c.put("feed-since", new Response(String(Date.now())))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (e) => {
@@ -58,6 +63,27 @@ self.addEventListener("fetch", (e) => {
       return res;
     }))
   );
+});
+
+/* استقبال إشعار Web Push: النص يُجلب من /feed (لا حاجة لتشفير الحمولة) */
+self.addEventListener("push", (event) => {
+  event.waitUntil((async () => {
+    if (!WORKER_URL) return;
+    try {
+      const c = await caches.open(CACHE);
+      const old = await c.match("feed-since");
+      const since = old ? Number(await old.text()) : Date.now();
+      const r = await fetch(WORKER_URL.replace(/\/$/, "") + "/feed?since=" + since, { cache: "no-store" });
+      const j = await r.json();
+      (j.items || []).filter((m) => Number(m.time) > since).forEach((m) => {
+        self.registration.showNotification(m.title || "yallaakora ⚽", {
+          body: m.body || "", icon: "./icon.svg", badge: "./icon.svg",
+          tag: "kora-" + m.id, data: { url: m.url || "#/matches" }
+        });
+      });
+      if (j.now) await c.put("feed-since", new Response(String(j.now)));
+    } catch (_) {}
+  })());
 });
 
 self.addEventListener("notificationclick", (e) => {

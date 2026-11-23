@@ -1,0 +1,4 @@
+# للتطوير المحلي فقط: انسخ إلى .dev.vars ثم wrangler dev
+VAPID_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+# KORA_SECRET="your-secret"
+# OPENAI_API_KEY="sk-..."

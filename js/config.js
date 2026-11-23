@@ -39,6 +39,10 @@
        https://europe-west1-MY_PROJECT.cloudfunctions.net */
     functionsUrl: "",
 
+    /* Cloudflare Worker المجاني (بدون بطاقة) — يُفضَّل على Firebase عند ضبطه */
+    workerUrl: "",
+    vapidPublicKey: "BK9Uk4Wa1vj7poRO7kCW8xvpY9_GmyIw7IEqmPLcwIMPf2ZK8K2ZX1jrD3iinzoUg2y8uWxLTdqKuJQeG9O5nOI",
+
     /* الإعلانات والرعاة — كلها معطّلة افتراضياً حتى تُضيف بياناتك */
     ads: {
       enabled: false,

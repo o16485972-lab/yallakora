@@ -1,0 +1,20 @@
+name = "yallakora-push"
+main = "index.js"
+compatibility_date = "2026-01-01"
+
+# أنشئ KV من: Workers & Pages > KV > Create namespace
+# ثم ضع الـ ID هنا (أو استخدم wrangler kv namespace create KORA_KV)
+[[kv_namespaces]]
+binding = "KORA_KV"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# تنبيه بدء المباريات كل 5 دقائق (مجاني في خطة Workers)
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+# المفتاح العام من ملف مفاتيح VAPID — عام وآمن نشره في الموقع أيضاً
+VAPID_PUBLIC_KEY = "BK9Uk4Wa1vj7poRO7kCW8xvpY9_GmyIw7IEqmPLcwIMPf2ZK8K2ZX1jrD3iinzoUg2y8uWxLTdqKuJQeG9O5nOI"
+OPENAI_MODEL = "gpt-4o-mini"
+# KORA_SECRET = "اختياري-لحماية-الإرسال-اليدوي"
+# OPENAI_API_KEY = "اختياري-للملخص-المدفوع"

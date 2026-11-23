@@ -87,6 +87,8 @@
     return !!(f.apiKey && f.messagingSenderId && f.appId && f.vapidKey);
   };
   const getFunctionsUrl = () => store.get("functions_url", CFG.functionsUrl || "");
+  const getWorkerUrl = () => store.get("worker_url", CFG.workerUrl || "");
+  const getVapidKey = () => store.get("vapid_public", CFG.vapidPublicKey || "");
   const getAiEndpoint = () => store.get("ai_endpoint", (CFG.ai || {}).endpoint || "");
   const fcmStatusText = () => ({
     off: "غير مُعدّ", ready: "جاهز ✔", denied: "إذن مرفوض", error: "تعذّر الاتصال", loading: "جارٍ التهيئة..."
@@ -132,6 +134,50 @@
     } catch (err) {
       fcmState = "error";
       console.warn("FCM init failed:", err);
+    }
+  }
+
+  /* --- Web Push عبر Cloudflare Worker (بدون Firebase وبطاقة) --- */
+  let webpushState = "off";
+  const webpushStatusText = () => ({
+    off: "غير مُعدّ", ready: "مفعّل ✔", denied: "إذن مرفوض", error: "تعذّر الاشتراك", loading: "جارٍ التفعيل..."
+  })[webpushState] || webpushState;
+
+  function urlB64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const raw = atob(base64);
+    return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+  }
+
+  async function initWebPush() {
+    const worker = getWorkerUrl();
+    const key = getVapidKey();
+    if (!worker || !key || !("PushManager" in window) || !("serviceWorker" in navigator)) return;
+    webpushState = "loading";
+    try {
+      if (Notification.permission === "default") await Notification.requestPermission();
+      if (Notification.permission !== "granted") { webpushState = "denied"; return; }
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlB64ToUint8Array(key)
+        });
+      }
+      let id = store.get("webpush_id", "");
+      if (!id) { id = "wp_" + Math.random().toString(36).slice(2) + Date.now().toString(36); store.set("webpush_id", id); }
+      await fetch(worker.replace(/\/$/, "") + "/register", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, endpoint: sub.endpoint, city: getCity().key, favorites: getFavs() })
+      });
+      webpushState = "ready";
+      store.set("webpush_on", true);
+      if ((location.hash || "").includes("settings")) renderSettingsPage();
+    } catch (err) {
+      webpushState = "error";
+      console.warn("Web Push init failed:", err);
     }
   }
 
@@ -915,6 +961,8 @@
           <h3>🔔 إشعارات المباريات</h3>
           <p>حالة الإذن: <b>${esc(perm === "granted" ? "مسموح" : perm === "denied" ? "مرفوض" : "لم يُطلب بعد")}</b> · التفعيل: <b>${on ? "مفعّل" : "غير مفعّل"}</b></p>
           <p class="modal-note">تنبيه قبل بدء مباريات فرقك المتابَعة بـ ${esc((CFG.notifications || {}).minutesBefore || 15)} دقيقة، وأثناء فتح الموقع.</p>
+          <p>إشعارات الخلفية (Cloudflare): <b>${esc(webpushStatusText())}</b>${getWorkerUrl() ? "" : " — أضف رابط الـ Worker من <code>#/admin</code>"}</p>
+          ${getWorkerUrl() ? `<button class="source-link" data-action="webpush-toggle">${webpushState === "ready" ? "إلغاء اشتراك الإشعارات" : "تفعيل إشعارات الخلفية"}</button>` : ""}
           <p>FCM في الخلفية: <b>${esc(fcmStatusText())}</b>${fcmConfigured() ? "" : " — أضف بيانات Firebase في <code>js/config.js</code>"}</p>
           ${fcmToken ? `<p class="modal-note" dir="ltr" style="word-break:break-all;font-size:10px">${esc(fcmToken)}</p>` : ""}
           <div class="source-links">
@@ -967,6 +1015,8 @@
     const cfg = [
       ["بيانات حية (ESPN)", status(!!D.liveMode)],
       ["إشعارات المتصفح", status(notifyOn())],
+      ["Cloudflare Worker", status(!!getWorkerUrl())],
+      ["Web Push", status(webpushState === "ready")],
       ["Firebase / FCM", fcmConfigured() ? status(fcmState === "ready") : `<span class="pill-off">بانتظار البيانات</span>`],
       ["واجهة AI", status(!!((CFG.ai || {}).endpoint))],
       ["AdSense", status(!!(a.enabled && a.adsenseClient))],
@@ -1002,6 +1052,8 @@
         <h3>🔌 الربط بالـ Backend والإعلانات</h3>
         <p class="modal-note">تُحفظ هذه الروابط على جهازك فقط. <b>لا تكتب مفاتيح سرية هنا</b> — الروابط ومعرّف المعلن بيانات عامة.</p>
         <div class="admin-form admin-form-2">
+          <input id="cfgWorkerUrl" dir="ltr" placeholder="https://yallakora-push.<account>.workers.dev" value="${esc(getWorkerUrl())}" />
+          <input id="cfgVapidPublic" dir="ltr" placeholder="VAPID public key" value="${esc(getVapidKey())}" />
           <input id="cfgFunctionsUrl" dir="ltr" placeholder="https://europe-west1-PROJECT.cloudfunctions.net" value="${esc(getFunctionsUrl())}" />
           <input id="cfgAiEndpoint" dir="ltr" placeholder="https://.../aiBrief" value="${esc(getAiEndpoint())}" />
           <input id="cfgAdsClient" dir="ltr" placeholder="ca-pub-XXXXXXXXXXXXXXXX" value="${esc(adCfg().adsenseClient)}" />
@@ -1663,6 +1715,24 @@
       return;
     }
     if (a === "notify-test") { pushNotify("yallaakora ⚽", "إشعار تجريبي — الإشعارات تعمل بشكل صحيح!"); toast("تم إرسال الإشعار التجريبي"); return; }
+    if (a === "webpush-toggle") {
+      if (!getWorkerUrl()) { toast("أضف رابط Worker أولاً من لوحة التحكم"); return; }
+      if (webpushState === "ready") {
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager.getSubscription();
+          if (sub) await sub.unsubscribe();
+        } catch (_) {}
+        store.set("webpush_on", false);
+        webpushState = "off";
+        toast("تم إيقاف إشعارات الخلفية");
+      } else {
+        await initWebPush();
+        toast(webpushState === "ready" ? "تم تفعيل إشعارات الخلفية 🔔" : "تعذّر التفعيل — تأكد من إذن الإشعارات");
+      }
+      renderSettingsPage();
+      return;
+    }
     if (a === "fcm-copy") {
       try { await navigator.clipboard.writeText(fcmToken); toast("تم نسخ رمز الجهاز"); }
       catch (_) { toast("تعذّر النسخ — انسخ الرمز يدوياً"); }
@@ -1716,6 +1786,8 @@
       return;
     }
     if (a === "admin-save-config") {
+      store.set("worker_url", (document.getElementById("cfgWorkerUrl")?.value || "").trim());
+      store.set("vapid_public", (document.getElementById("cfgVapidPublic")?.value || "").trim());
       store.set("functions_url", (document.getElementById("cfgFunctionsUrl")?.value || "").trim());
       store.set("ai_endpoint", (document.getElementById("cfgAiEndpoint")?.value || "").trim());
       store.set("ads_client", (document.getElementById("cfgAdsClient")?.value || "").trim());
@@ -1883,6 +1955,7 @@
   /* ---------- boot ---------- */
   fcmToken = store.get("fcm_token", "");
   fcmState = fcmToken ? "ready" : "off";
+  webpushState = store.get("webpush_on", false) ? "ready" : "off";
   initChrome();
   renderLeagueTabs();
   renderScoreTicker();
@@ -1896,11 +1969,16 @@
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       const f = CFG.firebase || {};
-      const swUrl = (f.apiKey && f.messagingSenderId && f.appId)
-        ? "./sw.js?senderId=" + encodeURIComponent(f.messagingSenderId) + "&appId=" + encodeURIComponent(f.appId)
-        : "./sw.js";
+      const q = new URLSearchParams();
+      if (f.apiKey && f.messagingSenderId && f.appId) {
+        q.set("senderId", f.messagingSenderId);
+        q.set("appId", f.appId);
+      }
+      const worker = getWorkerUrl();
+      if (worker) q.set("worker", worker);
+      const swUrl = "./sw.js" + (q.toString() ? "?" + q.toString() : "");
       navigator.serviceWorker.register(swUrl)
-        .then(() => { if (fcmConfigured()) initFCM(); })
+        .then(() => { if (worker) initWebPush(); else if (fcmConfigured()) initFCM(); })
         .catch(() => {});
     });
   }

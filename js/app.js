@@ -599,6 +599,61 @@
     return bits.length ? `<div class="match-extras">${bits.join("")}</div>` : "";
   }
 
+  function matchCenter(m, h, a) {
+    const events = (m.details || []).slice().reverse();
+    const typeOf = (d) => String((d.type && d.type.text) || "");
+    const labelOf = (s) => /penalty/i.test(s) ? "ركلة جزاء" : /goal/i.test(s) ? "هدف" : /red/i.test(s) ? "بطاقة حمراء" : /yellow|card/i.test(s) ? "بطاقة صفراء" : /substitution|sub/i.test(s) ? "تبديل" : "حدث";
+    const iconOf = (s) => /goal|penalty/i.test(s) ? "⚽" : /red/i.test(s) ? "🟥" : /yellow|card/i.test(s) ? "🟨" : "↔";
+    const ofSide = (id) => events.filter((d) => String((d.team || {}).id || "") === String(id));
+    const count = (id, re) => ofSide(id).filter((d) => re.test(typeOf(d))).length;
+    const rows = [
+      ["الأهداف", /goal|penalty/i, "⚽"],
+      ["بطاقات صفراء", /yellow/i, "🟨"],
+      ["بطاقات حمراء", /red/i, "🟥"],
+      ["تبديلات", /substitution|sub/i, "↔"]
+    ];
+
+    const summary = `
+      <div style="font-size:12px;line-height:2;color:var(--ink-2)">
+        <p>الموعد: ${esc(m.time)}</p>
+        <p>الحالة: ${m.status === "live" ? "مباشر الآن" : m.status === "finished" ? "انتهت المباراة" : "لم تبدأ بعد"}</p>
+        <p>البطولة: ${esc(m.league)}</p>
+      </div>
+      ${matchExtras(m)}
+      <button class="vote-btn" data-action="rate-player" style="margin-top:14px">اختر رجل المباراة</button>
+      ${m.link ? `<a class="vote-btn" style="display:block;text-align:center;margin-top:10px;text-decoration:none" href="${esc(m.link)}" target="_blank" rel="noopener">المشاهدة الرسمية / المصدر ↗</a>` : `<p class="modal-note" style="margin-top:10px">المشاهدة الكاملة تخضع لحقوق النقل.</p>`}`;
+
+    const eventList = events.length
+      ? events.slice(0, 20).map((d) => {
+          const ty = typeOf(d);
+          const who = (d.athlete && d.athlete.displayName) || (d.text || "").replace(/^Goal\s*[-:]?\s*/i, "");
+          return `<div class="mc-event">
+            <span class="mc-min">${esc((d.clock && d.clock.displayValue) || "—")}</span>
+            <span class="mc-ico">${iconOf(ty)}</span>
+            <span class="mc-what"><b>${esc(labelOf(ty))}</b><small>${esc(who)}</small></span>
+            <span class="mc-side">${esc((D.teams[String((d.team || {}).id)] || {}).code || "")}</span>
+          </div>`;
+        }).join("")
+      : `<p class="modal-note">لا توجد أحداث متاحة لهذه المباراة بعد. تابع التحديث المباشر.</p>`;
+
+    const stats = `<div class="mc-stats">
+      <div class="mc-stat-head"><span>${esc(h.code)}</span><b>إحصائيات الأحداث</b><span>${esc(a.code)}</span></div>
+      ${rows.map(([label, re, ico]) => `<div class="mc-stat-row"><span>${count(m.home, re)}</span><b>${ico} ${label}</b><span>${count(m.away, re)}</span></div>`).join("")}
+      <div class="mc-stat-row"><span>${ofSide(m.home).length}</span><b>إجمالي الأحداث</b><span>${ofSide(m.away).length}</span></div>
+    </div><p class="modal-note" style="margin-top:10px">الإحصائيات محسوبة من أحداث المباراة المتاحة في مصدر البيانات الحي.</p>`;
+
+    return `<div class="match-center">
+      <div class="mc-tabs" role="tablist">
+        <button class="mc-tab active" data-action="match-tab" data-tab="summary">الملخص</button>
+        <button class="mc-tab" data-action="match-tab" data-tab="events">أحداث المباراة</button>
+        <button class="mc-tab" data-action="match-tab" data-tab="stats">الإحصائيات</button>
+      </div>
+      <div class="mc-panel active" data-panel="summary">${summary}</div>
+      <div class="mc-panel" data-panel="events">${eventList}</div>
+      <div class="mc-panel" data-panel="stats">${stats}</div>
+    </div>`;
+  }
+
   function showMatch(id) {
     const m = findMatch(id);
     if (!m) return;
@@ -611,14 +666,7 @@
         <div class="sc">${esc(m.hs)} - ${esc(m.as)}</div>
         <div class="tm">${badge(a)}<span>${esc(a.name)}</span></div>
       </div>
-      <div style="font-size:12px;line-height:2;color:var(--ink-2)">
-        <p>الموعد: ${esc(m.time)}</p>
-        <p>الحالة: ${m.status === "live" ? "مباشر الآن" : m.status === "finished" ? "انتهت المباراة" : "لم تبدأ بعد"}</p>
-        <p>البطولة: ${esc(m.league)}</p>
-      </div>
-      ${matchExtras(m)}
-      <button class="vote-btn" data-action="rate-player" style="margin-top:14px">اختر رجل المباراة</button>
-      ${m.link ? `<a class="vote-btn" style="display:block;text-align:center;margin-top:10px;text-decoration:none" href="${esc(m.link)}" target="_blank" rel="noopener">المشاهدة الرسمية / المصدر ↗</a>` : `<p class="modal-note" style="margin-top:10px">المشاهدة الكاملة تخضع لحقوق النقل.</p>`}`, "تفاصيل المباراة");
+      ${matchCenter(m, h, a)}`, "مركز المباراة");
   }
 
   function showVideo(title, image) {
@@ -640,6 +688,36 @@
       <p class="modal-note" id="rateNote">${(() => { const v = store.get("motm", null); return v ? "اختيارك الحالي: " + v : "اختر لاعباً واحداً"; })()}</p>`, "رجل المباراة");
   }
 
+  /* ---------- شريط الدوريات السريع + لوحة النتائج (مقارنة بالموقعات العالمية) ---------- */
+  function renderLeagueTabs() {
+    const el = document.getElementById("leagueTabs");
+    if (!el) return;
+    const list = (D.leagues || []).slice(0, 7);
+    el.innerHTML = list.map((l) =>
+      `<button class="league-tab" data-action="league" data-name="${esc(l.name)}">${esc(l.icon || "⚽")} ${esc(l.name)}</button>`
+    ).join("");
+  }
+
+  function renderScoreTicker() {
+    const el = document.getElementById("scoreTicker");
+    if (!el) return;
+    const list = (D.matches && D.matches.today || []).slice(0, 12);
+    el.innerHTML = `<div class="container ticker-inner">
+      <span class="ticker-label"><span class="live-dot"></span> نتائج اليوم</span>
+      <div class="ticker-scroll">${list.map((m) => {
+        const h = D.teams[m.home] || {}, aw = D.teams[m.away] || {};
+        return `<button class="ticker-item ${m.status === "live" ? "is-live" : ""}" data-action="match" data-id="${esc(m.id)}">
+          <span class="t-league">${esc(m.league)}</span>
+          <span class="t-team">${badge(h)} ${esc(h.code || "")}</span>
+          <b class="t-score">${esc(m.hs)} - ${esc(m.as)}</b>
+          <span class="t-team">${badge(aw)} ${esc(aw.code || "")}</span>
+          <span class="t-time">${esc(m.status === "live" ? m.minute : m.time)}</span>
+        </button>`;
+      }).join("")}</div>
+      <a class="ticker-all" href="#/matches">اللوحة الكاملة ←</a>
+    </div>`;
+  }
+
   /* ---------- delegation ---------- */
   document.addEventListener("click", (e) => {
     const t = e.target.closest("[data-action]");
@@ -651,6 +729,14 @@
     if (a === "league") { location.hash = "#/leagues?league=" + encodeURIComponent(t.dataset.name); return; }
     if (a === "match") { showMatch(t.dataset.id); return; }
     if (a === "video") { showVideo(t.dataset.title, t.dataset.image); return; }
+    if (a === "match-tab") {
+      const box = t.closest(".match-center");
+      if (box) {
+        box.querySelectorAll(".mc-tab").forEach((x) => x.classList.toggle("active", x === t));
+        box.querySelectorAll(".mc-panel").forEach((p) => p.classList.toggle("active", p.dataset.panel === t.dataset.tab));
+      }
+      return;
+    }
     if (a === "match-details") {
       const id = t.dataset.id ||
         (D.matches.today[0] && D.matches.today[0].id) ||
@@ -748,6 +834,8 @@
         try { data = await window.KORA_ENRICH.load(data); } catch (err) { console.warn("Enrichment unavailable:", err); }
       }
       D = data;
+      renderLeagueTabs();
+      renderScoreTicker();
       status.classList.remove("error");
       status.textContent = "بيانات حية · " + new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
       route();
@@ -769,6 +857,8 @@
 
   /* ---------- boot ---------- */
   initChrome();
+  renderLeagueTabs();
+  renderScoreTicker();
   if (!location.hash) location.hash = "#/";
   window.addEventListener("hashchange", route);
   route();

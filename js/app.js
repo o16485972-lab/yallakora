@@ -633,9 +633,14 @@
     const cached = store.get(key, null);
     if (cached && cached.html) { box.innerHTML = cached.html; return; }
     box.innerHTML = `<p class="modal-note">جارٍ جلب التشكيلات...</p>`;
-    const POS = {
-      Goalkeeper: "حارس", Defender: "مدافع", Midfielder: "خط وسط",
-      Forward: "مهاجم", Substitute: "بديل"
+    const POS = (s) => {
+      const v = String(s || "");
+      if (/goal|keeper/i.test(v)) return "حارس";
+      if (/sub/i.test(v)) return "بديل";
+      if (/back|defen/i.test(v)) return "مدافع";
+      if (/mid|centre|center/i.test(v)) return "خط وسط";
+      if (/forward|wing|attack|striker/i.test(v)) return "مهاجم";
+      return v;
     };
     try {
       const q = encodeURIComponent((m.homeRaw || "") + " vs " + (m.awayRaw || ""));
@@ -652,7 +657,7 @@
         const subs = list.filter((r) => String(r.strSubstitute).toLowerCase() === "yes");
         const one = (r) => `<div class="lineup-player">
           ${r.strCutout || r.strThumb ? `<img src="${esc(r.strCutout || r.strThumb)}" alt="" loading="lazy" onerror="this.remove()">` : `<span class="lineup-num">${esc(r.intSquadNumber || "—")}</span>`}
-          <div><b>${esc(r.strPlayer || "لاعب")}</b><small>${esc(POS[r.strPosition] || r.strPosition || "")}</small></div>
+          <div><b>${esc(r.strPlayer || "لاعب")}</b><small>${esc(POS(r.strPosition))}${r.intSquadNumber ? " · #" + esc(r.intSquadNumber) : ""}</small></div>
         </div>`;
         return `<div class="lineup-side"><h4>${esc(title)}</h4>
           <div class="lineup-label">التشكيل الأساسي</div>${xi.map(one).join("") || `<p class="modal-note">غير متوفر</p>`}

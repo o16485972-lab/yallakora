@@ -28,6 +28,12 @@
     /* إشعارات المتصفح تعمل بدون سيرفر طالما الصفحة مفتوحة.
        إشعارات FCM الحقيقية (حتى مع إغلاق المتصفح) تحتاج بياناتك: */
     notifications: { minutesBefore: 15 },
+    /* خطوات التفعيل:
+       1) أنشئ مشروع Firebase وفعّل Cloud Messaging.
+       2) Firebase Console > Project settings > Your apps > Web app → apiKey / appId / messagingSenderId.
+       3) Cloud Messaging > Web configuration > Generate key pair → vapidKey.
+       4) الصق القيم هنا. يتولّى الموقع تسجيل الـ Service Worker وطلب الإذن وجلب رمز الجهاز تلقائياً.
+       ملاحظة: إرسال الإشعارات فعلياً يحتاج خادم/دالة سحابية ترسل عبر FCM باستخدام رمز الخادم (Server Key). */
     firebase: { apiKey: "", messagingSenderId: "", appId: "", vapidKey: "" },
 
     /* الإعلانات والرعاة — كلها معطّلة افتراضياً حتى تُضيف بياناتك */

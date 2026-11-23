@@ -79,6 +79,53 @@
     store.set("notified", [...sent, ...soon.map((m) => m.id)].slice(-200));
   }
 
+  /* --- Firebase Cloud Messaging (يُفعّل تلقائياً عند وجود البيانات في config.js) --- */
+  let fcmToken = store.get("fcm_token", "");
+  let fcmState = fcmToken ? "ready" : "off";
+  const fcmConfigured = () => {
+    const f = CFG.firebase || {};
+    return !!(f.apiKey && f.messagingSenderId && f.appId && f.vapidKey);
+  };
+  const fcmStatusText = () => ({
+    off: "غير مُعدّ", ready: "جاهز ✔", denied: "إذن مرفوض", error: "تعذّر الاتصال", loading: "جارٍ التهيئة..."
+  })[fcmState] || fcmState;
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src; s.async = true;
+      s.onload = resolve; s.onerror = () => reject(new Error("script load failed: " + src));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function initFCM() {
+    if (!fcmConfigured() || !("Notification" in window)) return;
+    fcmState = "loading";
+    try {
+      await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
+      await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js");
+      const f = CFG.firebase;
+      if (!window.firebase.apps.length) {
+        window.firebase.initializeApp({ apiKey: f.apiKey, messagingSenderId: f.messagingSenderId, appId: f.appId });
+      }
+      const messaging = window.firebase.messaging();
+      if (Notification.permission === "default") await Notification.requestPermission();
+      if (Notification.permission !== "granted") { fcmState = "denied"; return; }
+      fcmToken = await messaging.getToken({ vapidKey: f.vapidKey });
+      store.set("fcm_token", fcmToken);
+      fcmState = "ready";
+      messaging.onMessage((p) => {
+        const n = p.notification || {};
+        pushNotify(n.title || "yallaakora ⚽", n.body || "");
+      });
+      if ((location.hash || "").includes("settings")) renderSettingsPage();
+    } catch (err) {
+      fcmState = "error";
+      console.warn("FCM init failed:", err);
+    }
+  }
+
   /* --- SEO ديناميكي لكل صفحة ومقال --- */
   function setSEO(o) {
     o = o || {};
@@ -849,10 +896,13 @@
         <div class="card settings-card">
           <h3>🔔 إشعارات المباريات</h3>
           <p>حالة الإذن: <b>${esc(perm === "granted" ? "مسموح" : perm === "denied" ? "مرفوض" : "لم يُطلب بعد")}</b> · التفعيل: <b>${on ? "مفعّل" : "غير مفعّل"}</b></p>
-          <p class="modal-note">تنبيه قبل بدء مباريات فرقك المتابَعة بـ ${esc((CFG.notifications || {}).minutesBefore || 15)} دقيقة، وأثناء فتح الموقع. الإشعارات في الخلفية الكاملة تحتاج Firebase Cloud Messaging وإعداداتك الخاصة.</p>
+          <p class="modal-note">تنبيه قبل بدء مباريات فرقك المتابَعة بـ ${esc((CFG.notifications || {}).minutesBefore || 15)} دقيقة، وأثناء فتح الموقع.</p>
+          <p>FCM في الخلفية: <b>${esc(fcmStatusText())}</b>${fcmConfigured() ? "" : " — أضف بيانات Firebase في <code>js/config.js</code>"}</p>
+          ${fcmToken ? `<p class="modal-note" dir="ltr" style="word-break:break-all;font-size:10px">${esc(fcmToken)}</p>` : ""}
           <div class="source-links">
             <button class="source-link" data-action="notify-toggle">${on ? "إيقاف الإشعارات" : "تفعيل الإشعارات"}</button>
             <button class="source-link" data-action="notify-test">إرسال إشعار تجريبي</button>
+            ${fcmToken ? `<button class="source-link" data-action="fcm-copy">نسخ رمز الجهاز</button>` : ""}
             ${installBtn}
           </div>
         </div>
@@ -899,7 +949,7 @@
     const cfg = [
       ["بيانات حية (ESPN)", status(!!D.liveMode)],
       ["إشعارات المتصفح", status(notifyOn())],
-      ["Firebase / FCM", status(!!((CFG.firebase || {}).apiKey))],
+      ["Firebase / FCM", fcmConfigured() ? status(fcmState === "ready") : `<span class="pill-off">بانتظار البيانات</span>`],
       ["واجهة AI", status(!!((CFG.ai || {}).endpoint))],
       ["AdSense", status(!!(a.enabled && a.adsenseClient))],
       ["PWA / Service Worker", status("serviceWorker" in navigator)]
@@ -1583,6 +1633,11 @@
       return;
     }
     if (a === "notify-test") { pushNotify("yallaakora ⚽", "إشعار تجريبي — الإشعارات تعمل بشكل صحيح!"); toast("تم إرسال الإشعار التجريبي"); return; }
+    if (a === "fcm-copy") {
+      try { await navigator.clipboard.writeText(fcmToken); toast("تم نسخ رمز الجهاز"); }
+      catch (_) { toast("تعذّر النسخ — انسخ الرمز يدوياً"); }
+      return;
+    }
     if (a === "install-app") {
       const p = window.__koraInstallPrompt;
       if (p) { p.prompt(); await p.userChoice; window.__koraInstallPrompt = null; renderSettingsPage(); }
@@ -1794,9 +1849,17 @@
   refreshLive(true);
   setInterval(() => { if (!document.hidden) refreshLive(false); }, 5 * 60 * 1000);
 
-  /* تثبيت الموقع كتطبيق (PWA) + العمل دون اتصال */
+  /* تثبيت الموقع كتطبيق (PWA) + العمل دون اتصال + FCM اختياري */
   if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => { navigator.serviceWorker.register("./sw.js").catch(() => {}); });
+    window.addEventListener("load", () => {
+      const f = CFG.firebase || {};
+      const swUrl = (f.apiKey && f.messagingSenderId && f.appId)
+        ? "./sw.js?senderId=" + encodeURIComponent(f.messagingSenderId) + "&appId=" + encodeURIComponent(f.appId)
+        : "./sw.js";
+      navigator.serviceWorker.register(swUrl)
+        .then(() => { if (fcmConfigured()) initFCM(); })
+        .catch(() => {});
+    });
   }
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();

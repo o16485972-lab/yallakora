@@ -132,6 +132,7 @@
           status: st,
           minute: st === "live" ? ((ev.status && (ev.status.displayClock || (ev.status.type && ev.status.type.shortDetail))) || "الآن") : "",
           leagueKey: r.league.key,
+          link: (ev.links && ev.links[0] && ev.links[0].href) || "",
           details: comp.details || []
         });
       });
@@ -284,6 +285,7 @@
     });
     if (!events.length) events.push({ min: "", type: "sub", text: "متابعة المباراة", team: "" });
     return {
+      id: live.id,
       league: live.league,
       home: live.home, away: live.away,
       hs: live.hs, as: live.as,
@@ -366,6 +368,7 @@
       poll: base.poll,
       stats: { ...stats, upcoming: upcoming },
       live: liveData ? {
+        id: liveData.id,
         league: liveData.league,
         home: liveData.home,
         away: liveData.away,

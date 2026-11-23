@@ -335,7 +335,7 @@
         <span>${esc(e.text)}</span>
       </div>`).join("")}</div>
       <div class="live-actions">
-        <button data-action="match-details">تفاصيل المباراة</button>
+        <button data-action="match-details" data-id="${esc(l.id || "")}">تفاصيل المباراة</button>
         <button data-action="rate-player">اختر رجل المباراة</button>
       </div>
     </div>`;
@@ -568,7 +568,8 @@
         <p>الحالة: ${m.status === "live" ? "مباشر الآن" : m.status === "finished" ? "انتهت المباراة" : "لم تبدأ بعد"}</p>
         <p>البطولة: ${esc(m.league)}</p>
       </div>
-      <button class="vote-btn" data-action="rate-player" style="margin-top:14px">اختر رجل المباراة</button>`, "تفاصيل المباراة");
+      <button class="vote-btn" data-action="rate-player" style="margin-top:14px">اختر رجل المباراة</button>
+      ${m.link ? `<a class="vote-btn" style="display:block;text-align:center;margin-top:10px;text-decoration:none" href="${esc(m.link)}" target="_blank" rel="noopener">المشاهدة الرسمية / المصدر ↗</a>` : `<p class="modal-note" style="margin-top:10px">المشاهدة الكاملة تخضع لحقوق النقل.</p>`}`, "تفاصيل المباراة");
   }
 
   function showVideo(title, image) {
@@ -601,7 +602,14 @@
     if (a === "league") { location.hash = "#/leagues?league=" + encodeURIComponent(t.dataset.name); return; }
     if (a === "match") { showMatch(t.dataset.id); return; }
     if (a === "video") { showVideo(t.dataset.title, t.dataset.image); return; }
-    if (a === "match-details") { showMatch("t1"); return; }
+    if (a === "match-details") {
+      const id = t.dataset.id ||
+        (D.matches.today[0] && D.matches.today[0].id) ||
+        (D.matches.yesterday[0] && D.matches.yesterday[0].id) ||
+        (D.matches.tomorrow[0] && D.matches.tomorrow[0].id);
+      if (id) showMatch(id); else toast("لا توجد تفاصيل متاحة حالياً");
+      return;
+    }
     if (a === "rate-player") { showRate(); return; }
     if (a === "rate-save") {
       store.set("motm", t.dataset.name);

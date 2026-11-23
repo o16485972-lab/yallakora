@@ -629,7 +629,7 @@
   }
 
   async function loadLineup(box, m) {
-    const key = "lineup_" + m.id;
+    const key = "lineup_v2_" + m.id;
     const cached = store.get(key, null);
     if (cached && cached.html) { box.innerHTML = cached.html; return; }
     box.innerHTML = `<p class="modal-note">جارٍ جلب التشكيلات...</p>`;

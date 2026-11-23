@@ -699,9 +699,8 @@
       store.set(key, rows);
       box.innerHTML = lineupHTML(m, rows);
     } catch (err) {
-      const dbg = { id: m.id, home: m.home, away: m.away, homeRaw: m.homeRaw, awayRaw: m.awayRaw, teams: [D.teams[m.home], D.teams[m.away]] };
-      console.warn("Lineup unavailable:", JSON.stringify(dbg), err);
-      box.innerHTML = `<p class="modal-note">التشكيلات غير متوفرة حالياً [${esc(JSON.stringify({ id: m.id, h: m.homeRaw, a: m.awayRaw, th: (D.teams[m.home] || {}).name, ta: (D.teams[m.away] || {}).name }))}]</p>`;
+      console.warn("Lineup unavailable:", m.id, err);
+      box.innerHTML = `<p class="modal-note">التشكيلات غير متوفرة لهذه المباراة في مصدر البيانات حالياً.</p>`;
     }
   }
 
@@ -997,9 +996,9 @@
       D = data;
       renderLeagueTabs();
       renderScoreTicker();
+      route();
       status.classList.remove("error");
       status.textContent = "بيانات حية · " + new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
-      route();
       if (showToast) toast("تم تحديث البيانات من المصدر الحي");
     } catch (err) {
       status.textContent = "بيانات تجريبية";

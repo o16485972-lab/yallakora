@@ -189,7 +189,8 @@
       "الدوري المصري": "#/leagues?league=الدوري%20المصري", "الدوري الإنجليزي": "#/leagues?league=الدوري%20الإنجليزي",
       "الدوري الإسباني": "#/leagues?league=الدوري%20الإسباني", "دوري أبطال أفريقيا": "#/leagues?league=دوري%20أبطال%20أفريقيا",
       "الدوري السعودي": "#/leagues?league=الدوري%20السعودي", "من نحن": "#/about",
-      "اتصل بنا": "#/contact", "للإعلان معنا": "#/advertise", "سياسة الخصوصية": "#/policy"
+      "اتصل بنا": "#/contact", "للإعلان معنا": "#/advertise", "سياسة الخصوصية": "#/policy",
+      "المصادر الرسمية": "#/sources"
     };
     return map[label] || "#/";
   }
@@ -414,6 +415,44 @@
     </div>`).join("")}</div>`;
   }
 
+  /* ---------- مصادر رسمية / فيديو قانوني ---------- */
+  function officialVideosHTML(limit) {
+    const list = (window.KORA_OFFICIAL_VIDEOS || []).slice(0, limit || 6);
+    if (!list.length) return "";
+    return `<div class="official-grid">${list.map((v) => `<button class="official-card" data-action="official-video" data-id="${esc(v.id)}" data-title="${esc(v.title)}" data-source="${esc(v.source)}" data-source-url="${esc(v.sourceUrl)}" data-kind="${esc(v.kind)}">
+      <span class="official-thumb"><img src="${esc(v.thumb)}" alt="${esc(v.title)}" loading="lazy" onerror="this.remove()"><span class="official-play">▶</span><span class="official-kind">${esc(v.kind)}</span></span>
+      <span class="official-meta"><b>${esc(v.title)}</b><small>${esc(v.source)} · تضمين رسمي</small></span>
+    </button>`).join("")}</div>`;
+  }
+
+  function sourcesHTML() {
+    const list = window.KORA_SOURCES || [];
+    return `<div class="sources-grid">${list.map((s) => `<article class="source-card card">
+      <div class="source-card-head"><span class="source-tag">${esc(s.tag)}</span><h3>${esc(s.name)}</h3></div>
+      <p>${esc(s.desc)}</p>
+      <div class="source-links"><a class="source-link" href="${esc(s.url)}" target="_blank" rel="noopener">زيارة المصدر ↗</a>${s.extra ? `<a class="source-link" href="${esc(s.extraUrl)}" target="_blank" rel="noopener">${esc(s.extra)} ↗</a>` : ""}</div>
+    </article>`).join("")}</div>`;
+  }
+
+  function renderSourcesPage() {
+    view.innerHTML = `
+      <div class="page-head"><div class="breadcrumb"><a href="#/">الرئيسية</a> ‹ <span>المصادر الرسمية</span></div>
+        <h1>المصادر الرسمية والفيديو القانوني</h1>
+        <p>مصادر تم التحقق منها توفر فيديو رسمياً أو بيانات برخصة مجانية. الموقع يضمّن فقط ما يسمح صاحبه بتضمينه، ولا يعيد بث مباريات محجوزة الحقوق.</p></div>
+      <section class="section">${sectionHead("فيديوهات رسمية قابلة للتضمين")}
+        ${officialVideosHTML(7)}
+        <p class="modal-note" style="margin-top:12px">الفيديو يُعرض عبر مشغّل يوتيوب الرسمي (youtube-nocookie) من القناة صاحبة الحقوق. قد تظهر قيود جغرافية حسب سياسة يوتيوب أو الناشر.</p>
+      </section>
+      <section class="section">${sectionHead("دليل المصادر والتراخيص")}
+        ${sourcesHTML()}
+      </section>
+      <section class="section"><div class="card" style="padding:20px;line-height:2;color:var(--ink-2)">
+        <h3 style="margin-top:0">ملاحظة حقوقية</h3>
+        <p>«مجاني» لا تعني دائماً «حرّ الحقوق». بعض القنوات الرسمية تسمح بالمشاهدة والتضمين عبر يوتيوب فقط، بينما ترخص ويكيميديا كومنز وOpen-Meteo إعادة الاستخدام مع ذكر المصدر. لا نستخدم أي رابط بث غير موثّق أو غير مصرّح بتضمينه.</p>
+        <p>بيانات النتائج من ESPN، والشعارات والتشكيلات وقنوات البث من TheSportsDB (مفتاح مجاني 123)، والطقس من Open-Meteo برخصة CC BY 4.0.</p>
+      </div></section>`;
+  }
+
   /* ---------- views ---------- */
   function renderHome() {
     const latest = D.news.slice(0, 8);
@@ -467,6 +506,10 @@
             </div>
           </div>
         </div>
+      </section>
+      <section class="section">
+        ${sectionHead("فيديو رسمي مجاني", "#/sources", "كل المصادر")}
+        ${officialVideosHTML(4)}
       </section>
       <section class="section">
         ${sectionHead("صور وفيديوهات", "#/media")}
@@ -620,7 +663,7 @@
   function matchExtras(m) {
     const bits = [];
     if (m.weather) {
-      bits.push(`<div class="match-extra"><span class="ex-ico">🌡️</span><div class="ex-txt"><b>طقس المباراة</b><span>${esc(m.weather.temp)}° · ${esc(m.weather.desc)}</span></div></div>`);
+      bits.push(`<div class="match-extra"><span class="ex-ico">🌡️</span><div class="ex-txt"><b>طقس المباراة</b><span>${esc(m.weather.temp)}° · ${esc(m.weather.desc)} · <a href="https://open-meteo.com/" target="_blank" rel="noopener" title="بيانات الطقس برخصة CC BY 4.0">Open-Meteo</a></span></div></div>`);
     }
     if (m.tv) {
       bits.push(`<div class="match-extra">${m.tv.logo ? `<img class="ex-logo" src="${esc(m.tv.logo)}" alt="" loading="lazy" onerror="this.remove()">` : `<span class="ex-ico">📺</span>`}<div class="ex-txt"><b>قناة البث الرسمية</b><span>${esc(m.tv.channel || "قناة رسمية")}${m.tv.country ? " · " + esc(m.tv.country) : ""}</span></div></div>`);
@@ -794,6 +837,14 @@
       <p class="modal-note">هذا عرض تجريبي لمشغل الفيديو. يمكنك ربطه بمصدر الفيديو الخاص بك.</p>`, "فيديو");
   }
 
+  function showOfficialVideo(v) {
+    if (!v || !v.id) return;
+    openModal(`
+      <div class="stream-player"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(v.id)}?rel=0" title="${esc(v.title)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div>
+      <h3 style="font-size:15px;font-weight:800;margin-top:6px">${esc(v.title)}</h3>
+      <p class="modal-note">المصدر: <a class="source-link" href="${esc(v.sourceUrl || "https://www.youtube.com")}" target="_blank" rel="noopener">${esc(v.source || "القناة الرسمية")} ↗</a> · ${esc(v.kind || "فيديو رسمي")} · يُعرض بتضمين يوتيوب الرسمي ولا يُعاد بثه داخل الموقع.</p>`, "فيديو رسمي");
+  }
+
   function showRate() {
     const players = ["محمد صلاح", "إرلينج هالاند", "المحمدي", "كول بالمر", "إيمام عاشور"];
     openModal(`<p style="font-size:13px;font-weight:700;margin-bottom:12px">من تختار كأفضل لاعب في المباراة؟</p>
@@ -847,6 +898,11 @@
     if (a === "league") { location.hash = "#/leagues?league=" + encodeURIComponent(t.dataset.name); return; }
     if (a === "match") { showMatch(t.dataset.id); return; }
     if (a === "video") { showVideo(t.dataset.title, t.dataset.image); return; }
+    if (a === "official-video") {
+      const v = (window.KORA_OFFICIAL_VIDEOS || []).find((x) => x.id === t.dataset.id);
+      showOfficialVideo(v || { id: t.dataset.id, title: t.dataset.title, source: t.dataset.source, sourceUrl: t.dataset.sourceUrl, kind: t.dataset.kind });
+      return;
+    }
     if (a === "match-tab") {
       const box = t.closest(".match-center");
       if (box) {
@@ -978,6 +1034,7 @@
     else if (key === "matches") renderMatchesPage();
     else if (key === "leagues") renderLeagues(query);
     else if (key === "search") renderSearchPage(query);
+    else if (key === "sources") renderSourcesPage();
     else renderSimplePage(key);
 
     if (location.hash !== "#/") window.scrollTo({ top: 0, behavior: "auto" });

@@ -628,47 +628,75 @@
     return bits.length ? `<div class="match-extras">${bits.join("")}</div>` : "";
   }
 
-  async function loadLineup(box, m) {
-    const key = "lineup_v2_" + m.id;
-    const cached = store.get(key, null);
-    if (cached && cached.html) { box.innerHTML = cached.html; return; }
-    box.innerHTML = `<p class="modal-note">جارٍ جلب التشكيلات...</p>`;
-    const POS = (s) => {
-      const v = String(s || "");
-      if (/goal|keeper/i.test(v)) return "حارس";
-      if (/sub/i.test(v)) return "بديل";
-      if (/back|defen/i.test(v)) return "مدافع";
-      if (/mid|centre|center/i.test(v)) return "خط وسط";
-      if (/forward|wing|attack|striker/i.test(v)) return "مهاجم";
-      return v;
+  const POS = (s) => {
+    const v = String(s || "");
+    if (/goal|keeper/i.test(v)) return "حارس";
+    if (/sub/i.test(v)) return "بديل";
+    if (/back|defen/i.test(v)) return "مدافع";
+    if (/mid|centre|center/i.test(v)) return "خط وسط";
+    if (/forward|wing|attack|striker/i.test(v)) return "مهاجم";
+    return v;
+  };
+
+  async function tsdb(url) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return await r.json();
+      } catch (e) {
+        if (attempt === 1) throw e;
+        await new Promise((res) => setTimeout(res, 400));
+      }
+    }
+  }
+
+  async function findLineupEvent(m) {
+    const h = String(m.homeRaw || (D.teams[m.home] || {}).name || "");
+    const a = String(m.awayRaw || (D.teams[m.away] || {}).name || "");
+    const queries = [h + " vs " + a, a + " vs " + h, h, a].filter((q) => q.trim());
+    for (const q of queries) {
+      try {
+        const j = await tsdb("https://www.thesportsdb.com/api/v1/json/123/searchevents.php?e=" + encodeURIComponent(q));
+        const ev = (j.event || [])[0];
+        if (ev && ev.idEvent) return ev;
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  function lineupHTML(m, rows) {
+    const side = (title, list) => {
+      const xi = list.filter((r) => String(r.strSubstitute).toLowerCase() !== "yes");
+      const subs = list.filter((r) => String(r.strSubstitute).toLowerCase() === "yes");
+      const one = (r) => `<div class="lineup-player">
+        ${r.strCutout || r.strThumb ? `<img src="${esc(r.strCutout || r.strThumb)}" alt="" loading="lazy" onerror="this.remove()">` : `<span class="lineup-num">${esc(r.intSquadNumber || "—")}</span>`}
+        <div><b>${esc(r.strPlayer || "لاعب")}</b><small>${esc(POS(r.strPosition))}${r.intSquadNumber ? " · #" + esc(r.intSquadNumber) : ""}</small></div>
+      </div>`;
+      return `<div class="lineup-side"><h4>${esc(title)}</h4>
+        <div class="lineup-label">التشكيل الأساسي</div>${xi.map(one).join("") || `<p class="modal-note">غير متوفر</p>`}
+        <div class="lineup-label">البدلاء</div>${subs.map(one).join("") || `<p class="modal-note">غير متوفر</p>`}
+      </div>`;
     };
+    return `<div class="lineup-grid">
+      ${side((D.teams[m.home] || {}).name || m.homeRaw || "الفريق الأول", rows.filter((r) => String(r.strHome).toLowerCase() === "yes"))}
+      ${side((D.teams[m.away] || {}).name || m.awayRaw || "الفريق الثاني", rows.filter((r) => String(r.strHome).toLowerCase() !== "yes"))}
+    </div>`;
+  }
+
+  async function loadLineup(box, m) {
+    const key = "lineup_rows_" + m.id;
+    const cached = store.get(key, null);
+    if (cached && cached.length) { box.innerHTML = lineupHTML(m, cached); return; }
+    box.innerHTML = `<p class="modal-note">جارٍ جلب التشكيلات...</p>`;
     try {
-      const q = encodeURIComponent((m.homeRaw || "") + " vs " + (m.awayRaw || ""));
-      const found = await fetch("https://www.thesportsdb.com/api/v1/json/123/searchevents.php?e=" + q)
-        .then((r) => r.json());
-      const ev = (found.event || [])[0];
+      const ev = await findLineupEvent(m);
       if (!ev) throw new Error("no-event");
-      const data = await fetch("https://www.thesportsdb.com/api/v1/json/123/lookuplineup.php?id=" + encodeURIComponent(ev.idEvent))
-        .then((r) => r.json());
+      const data = await tsdb("https://www.thesportsdb.com/api/v1/json/123/lookuplineup.php?id=" + encodeURIComponent(ev.idEvent));
       const rows = data.lineup || [];
       if (!rows.length) throw new Error("empty");
-      const side = (title, list) => {
-        const xi = list.filter((r) => String(r.strSubstitute).toLowerCase() !== "yes");
-        const subs = list.filter((r) => String(r.strSubstitute).toLowerCase() === "yes");
-        const one = (r) => `<div class="lineup-player">
-          ${r.strCutout || r.strThumb ? `<img src="${esc(r.strCutout || r.strThumb)}" alt="" loading="lazy" onerror="this.remove()">` : `<span class="lineup-num">${esc(r.intSquadNumber || "—")}</span>`}
-          <div><b>${esc(r.strPlayer || "لاعب")}</b><small>${esc(POS(r.strPosition))}${r.intSquadNumber ? " · #" + esc(r.intSquadNumber) : ""}</small></div>
-        </div>`;
-        return `<div class="lineup-side"><h4>${esc(title)}</h4>
-          <div class="lineup-label">التشكيل الأساسي</div>${xi.map(one).join("") || `<p class="modal-note">غير متوفر</p>`}
-          <div class="lineup-label">البدلاء</div>${subs.map(one).join("") || `<p class="modal-note">غير متوفر</p>`}
-        </div>`;
-      };
-      box.innerHTML = `<div class="lineup-grid">
-        ${side((D.teams[m.home] || {}).name || m.homeRaw || "الفريق الأول", rows.filter((r) => String(r.strHome).toLowerCase() === "yes"))}
-        ${side((D.teams[m.away] || {}).name || m.awayRaw || "الفريق الثاني", rows.filter((r) => String(r.strHome).toLowerCase() !== "yes"))}
-      </div>`;
-      store.set(key, { html: box.innerHTML });
+      store.set(key, rows);
+      box.innerHTML = lineupHTML(m, rows);
     } catch (_) {
       box.innerHTML = `<p class="modal-note">التشكيلات غير متوفرة لهذه المباراة في مصدر البيانات حالياً.</p>`;
     }

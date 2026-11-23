@@ -699,8 +699,9 @@
       store.set(key, rows);
       box.innerHTML = lineupHTML(m, rows);
     } catch (err) {
-      console.warn("Lineup unavailable:", { id: m.id, home: m.home, away: m.away, homeRaw: m.homeRaw, awayRaw: m.awayRaw, teams: [D.teams[m.home], D.teams[m.away]] }, err);
-      box.innerHTML = `<p class="modal-note">التشكيلات غير متوفرة لهذه المباراة في مصدر البيانات حالياً.</p>`;
+      const dbg = { id: m.id, home: m.home, away: m.away, homeRaw: m.homeRaw, awayRaw: m.awayRaw, teams: [D.teams[m.home], D.teams[m.away]] };
+      console.warn("Lineup unavailable:", JSON.stringify(dbg), err);
+      box.innerHTML = `<p class="modal-note">التشكيلات غير متوفرة حالياً [${esc(JSON.stringify({ id: m.id, h: m.homeRaw, a: m.awayRaw, th: (D.teams[m.home] || {}).name, ta: (D.teams[m.away] || {}).name }))}]</p>`;
     }
   }
 

@@ -80,8 +80,8 @@
   }
 
   /* --- Firebase Cloud Messaging (يُفعّل تلقائياً عند وجود البيانات في config.js) --- */
-  let fcmToken = store.get("fcm_token", "");
-  let fcmState = fcmToken ? "ready" : "off";
+  let fcmToken = "";
+  let fcmState = "off";
   const fcmConfigured = () => {
     const f = CFG.firebase || {};
     return !!(f.apiKey && f.messagingSenderId && f.appId && f.vapidKey);
@@ -1840,6 +1840,8 @@
   }, 20000);
 
   /* ---------- boot ---------- */
+  fcmToken = store.get("fcm_token", "");
+  fcmState = fcmToken ? "ready" : "off";
   initChrome();
   renderLeagueTabs();
   renderScoreTicker();

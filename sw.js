@@ -18,12 +18,12 @@ if (FCM_SENDER) {
   } catch (err) { /* FCM غير متاح بدون بيانات صحيحة */ }
 }
 
-const CACHE = "kora-v23";
+const CACHE = "kora-v24";
 const SHELL = [
   "./", "./index.html", "./manifest.json", "./icon.svg",
   "./css/styles.css?v=14", "./js/config.js", "./js/data.js?v=3",
   "./js/streams.js", "./js/sources.js?v=2", "./js/live.js?v=3",
-  "./js/enrich.js?v=6", "./js/app.js?v=23"
+  "./js/enrich.js?v=6", "./js/app.js?v=24"
 ];
 
 self.addEventListener("install", (e) => {

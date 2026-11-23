@@ -16,6 +16,7 @@
     newsFilter: "الكل",
     newsShown: 8,
     statsTab: "scorers",
+    showFavorites: false,
     liveMinute: 74,
     toastTimer: null
   };
@@ -81,6 +82,25 @@
       try { localStorage.setItem("kora_" + key, JSON.stringify(value)); } catch (_) {}
     }
   };
+
+  const getFavs = () => (store.get("favorites", []) || []).map(String);
+  const isFav = (id) => getFavs().includes(String(id));
+  const getComments = () => store.get("comments", []) || [];
+
+  function commentsHTML(key) {
+    const list = getComments().filter((c) => c.key === key);
+    return `<div class="comment-box" data-key="${esc(key)}">
+      <div class="comment-list">${list.length ? list.map((c) => `<div class="comment-item">
+        <div class="comment-avatar">${esc((c.name || "م").trim().charAt(0))}</div>
+        <div class="comment-body"><b>${esc(c.name)}</b><span>${esc(c.date)}</span><p>${esc(c.text)}</p></div>
+      </div>`).join("") : `<p class="modal-note">كن أول من يعلّق. شاركنا رأيك!</p>`}</div>
+      <div class="comment-form">
+        <input type="text" class="comment-name" placeholder="اسمك" maxlength="30" aria-label="اسمك" />
+        <textarea class="comment-text" placeholder="اكتب تعليقك..." maxlength="400" rows="2" aria-label="تعليقك"></textarea>
+        <button type="button" data-action="comment-submit" data-key="${esc(key)}">نشر التعليق</button>
+      </div>
+    </div>`;
+  }
 
   function toast(msg) {
     toastEl.textContent = msg;
@@ -507,6 +527,7 @@
           ${n.body.map((p) => `<p>${esc(p)}</p>`).join("")}
           ${n.link ? `<a class="source-link" href="${esc(n.link)}" target="_blank" rel="noopener">اقرأ المقال الأصلي في المصدر ↗</a>` : ""}
           <div class="article-share"><span>مشاركة:</span>${share.map((s) => `<a href="${s[1]}" target="_blank" rel="noopener">${s[0]}</a>`).join("")}</div>
+          <section class="article-comments"><h3>آراء القرّاء</h3>${commentsHTML("news_" + n.id)}</section>
         </div>
       </article>
       ${related.length ? `<section class="section related-box">${sectionHead("أخبار ذات صلة", "#/news")}<div class="news-grid">${related.map(newsCard).join("")}</div></section>` : ""}`;
@@ -515,13 +536,21 @@
 
   function renderMatchesPage() {
     const days = [["yesterday", "مباريات الأمس"], ["today", "مباريات اليوم"], ["tomorrow", "مباريات الغد"]];
+    const favs = getFavs();
+    const keep = (m) => !state.showFavorites || favs.includes(String(m.home)) || favs.includes(String(m.away));
+    const empty = `<div class="empty-state card"><span class="emoji">⭐</span>لم تتابع أي فريق بعد. افتح مباراة واضغط «متابعة» بجانب الفريق.</div>`;
     view.innerHTML = `
       <div class="page-head">
         <div class="breadcrumb"><a href="#/">الرئيسية</a> ‹ <span>المباريات</span></div>
         <h1>مركز المباريات</h1><p>نتائج ومواعيد كل المباريات في مختلف الدوريات</p>
+        <div class="filter-bar"><button class="filter-btn ${state.showFavorites ? "active" : ""}" data-action="fav-filter">⭐ متابعتي ${favs.length ? "(" + favs.length + ")" : ""}</button></div>
       </div>
       <div class="matches-page-grid">
-        <div>${days.map(([d, t]) => `<div class="day-group"><h3>${t}</h3><div class="strip-scroll">${D.matches[d].map(matchCard).join("")}</div></div>`).join("")}</div>
+        <div>${days.map(([d, t]) => {
+          const list = D.matches[d].filter(keep);
+          if (state.showFavorites && !list.length) return "";
+          return `<div class="day-group"><h3>${t}</h3><div class="strip-scroll">${list.map(matchCard).join("")}</div></div>`;
+        }).join("") || (state.showFavorites ? empty : "")}</div>
         <aside>${liveWidgetHTML()}<div style="height:20px"></div>${pollHTML()}</aside>
       </div>`;
   }
@@ -599,6 +628,47 @@
     return bits.length ? `<div class="match-extras">${bits.join("")}</div>` : "";
   }
 
+  async function loadLineup(box, m) {
+    const key = "lineup_" + m.id;
+    const cached = store.get(key, null);
+    if (cached && cached.html) { box.innerHTML = cached.html; return; }
+    box.innerHTML = `<p class="modal-note">جارٍ جلب التشكيلات...</p>`;
+    const POS = {
+      Goalkeeper: "حارس", Defender: "مدافع", Midfielder: "خط وسط",
+      Forward: "مهاجم", Substitute: "بديل"
+    };
+    try {
+      const q = encodeURIComponent((m.homeRaw || "") + " vs " + (m.awayRaw || ""));
+      const found = await fetch("https://www.thesportsdb.com/api/v1/json/123/searchevents.php?e=" + q)
+        .then((r) => r.json());
+      const ev = (found.event || [])[0];
+      if (!ev) throw new Error("no-event");
+      const data = await fetch("https://www.thesportsdb.com/api/v1/json/123/lookuplineup.php?id=" + encodeURIComponent(ev.idEvent))
+        .then((r) => r.json());
+      const rows = data.lineup || [];
+      if (!rows.length) throw new Error("empty");
+      const side = (title, list) => {
+        const xi = list.filter((r) => String(r.strSubstitute).toLowerCase() !== "yes");
+        const subs = list.filter((r) => String(r.strSubstitute).toLowerCase() === "yes");
+        const one = (r) => `<div class="lineup-player">
+          ${r.strCutout || r.strThumb ? `<img src="${esc(r.strCutout || r.strThumb)}" alt="" loading="lazy" onerror="this.remove()">` : `<span class="lineup-num">${esc(r.intSquadNumber || "—")}</span>`}
+          <div><b>${esc(r.strPlayer || "لاعب")}</b><small>${esc(POS[r.strPosition] || r.strPosition || "")}</small></div>
+        </div>`;
+        return `<div class="lineup-side"><h4>${esc(title)}</h4>
+          <div class="lineup-label">التشكيل الأساسي</div>${xi.map(one).join("") || `<p class="modal-note">غير متوفر</p>`}
+          <div class="lineup-label">البدلاء</div>${subs.map(one).join("") || `<p class="modal-note">غير متوفر</p>`}
+        </div>`;
+      };
+      box.innerHTML = `<div class="lineup-grid">
+        ${side((D.teams[m.home] || {}).name || m.homeRaw || "الفريق الأول", rows.filter((r) => String(r.strHome).toLowerCase() === "yes"))}
+        ${side((D.teams[m.away] || {}).name || m.awayRaw || "الفريق الثاني", rows.filter((r) => String(r.strHome).toLowerCase() !== "yes"))}
+      </div>`;
+      store.set(key, { html: box.innerHTML });
+    } catch (_) {
+      box.innerHTML = `<p class="modal-note">التشكيلات غير متوفرة لهذه المباراة في مصدر البيانات حالياً.</p>`;
+    }
+  }
+
   function matchCenter(m, h, a) {
     const events = (m.details || []).slice().reverse();
     const typeOf = (d) => String((d.type && d.type.text) || "");
@@ -620,6 +690,10 @@
         <p>البطولة: ${esc(m.league)}</p>
       </div>
       ${matchExtras(m)}
+      <div class="follow-row">
+        <button class="follow-btn ${isFav(m.home) ? "active" : ""}" data-action="follow-team" data-id="${esc(m.home)}" data-name="${esc(h.name)}">${isFav(m.home) ? "⭐ متابَع" : "☆ متابعة"} ${esc(h.code)}</button>
+        <button class="follow-btn ${isFav(m.away) ? "active" : ""}" data-action="follow-team" data-id="${esc(m.away)}" data-name="${esc(a.name)}">${isFav(m.away) ? "⭐ متابَع" : "☆ متابعة"} ${esc(a.code)}</button>
+      </div>
       <button class="vote-btn" data-action="rate-player" style="margin-top:14px">اختر رجل المباراة</button>
       ${m.link ? `<a class="vote-btn" style="display:block;text-align:center;margin-top:10px;text-decoration:none" href="${esc(m.link)}" target="_blank" rel="noopener">المشاهدة الرسمية / المصدر ↗</a>` : `<p class="modal-note" style="margin-top:10px">المشاهدة الكاملة تخضع لحقوق النقل.</p>`}`;
 
@@ -647,10 +721,14 @@
         <button class="mc-tab active" data-action="match-tab" data-tab="summary">الملخص</button>
         <button class="mc-tab" data-action="match-tab" data-tab="events">أحداث المباراة</button>
         <button class="mc-tab" data-action="match-tab" data-tab="stats">الإحصائيات</button>
+        <button class="mc-tab" data-action="match-tab" data-tab="lineups">التشكيلات</button>
+        <button class="mc-tab" data-action="match-tab" data-tab="comments">آراء القرّاء</button>
       </div>
       <div class="mc-panel active" data-panel="summary">${summary}</div>
       <div class="mc-panel" data-panel="events">${eventList}</div>
       <div class="mc-panel" data-panel="stats">${stats}</div>
+      <div class="mc-panel" data-panel="lineups"><div class="lineup-box" data-match="${esc(m.id)}"><p class="modal-note">اضغط تبويب «التشكيلات» لجلب التشكيل من المصدر.</p></div></div>
+      <div class="mc-panel" data-panel="comments">${commentsHTML("match_" + m.id)}</div>
     </div>`;
   }
 
@@ -693,7 +771,8 @@
     const el = document.getElementById("leagueTabs");
     if (!el) return;
     const list = (D.leagues || []).slice(0, 7);
-    el.innerHTML = list.map((l) =>
+    el.innerHTML = `<button class="league-tab fav-chip ${state.showFavorites ? "active" : ""}" data-action="fav-filter">⭐ متابعتي ${getFavs().length ? "(" + getFavs().length + ")" : ""}</button>` +
+      list.map((l) =>
       `<button class="league-tab" data-action="league" data-name="${esc(l.name)}">${esc(l.icon || "⚽")} ${esc(l.name)}</button>`
     ).join("");
   }
@@ -738,7 +817,48 @@
       if (box) {
         box.querySelectorAll(".mc-tab").forEach((x) => x.classList.toggle("active", x === t));
         box.querySelectorAll(".mc-panel").forEach((p) => p.classList.toggle("active", p.dataset.panel === t.dataset.tab));
+        if (t.dataset.tab === "lineups") {
+          const panel = box.querySelector('[data-panel="lineups"] .lineup-box');
+          if (panel && panel.dataset.loaded !== "1") {
+            panel.dataset.loaded = "1";
+            const m = findMatch(panel.dataset.match);
+            if (m) loadLineup(panel, m);
+          }
+        }
       }
+      return;
+    }
+    if (a === "follow-team") {
+      const id = String(t.dataset.id);
+      const favs = getFavs();
+      const i = favs.indexOf(id);
+      if (i >= 0) { favs.splice(i, 1); toast("تمت إزالة الفريق من متابعتي"); }
+      else { favs.push(id); toast("تمت متابعة الفريق"); }
+      store.set("favorites", favs);
+      document.querySelectorAll('[data-action="follow-team"]').forEach((b) => {
+        if (String(b.dataset.id) !== id) return;
+        const on = isFav(id);
+        b.classList.toggle("active", on);
+        b.textContent = (on ? "⭐ متابَع" : "☆ متابعة") + " " + (b.dataset.name || "");
+      });
+      return;
+    }
+    if (a === "fav-filter") {
+      state.showFavorites = !state.showFavorites;
+      if (location.hash !== "#/matches") location.hash = "#/matches";
+      else { renderMatchesPage(); renderLeagueTabs(); }
+      return;
+    }
+    if (a === "comment-submit") {
+      const box = t.closest(".comment-box");
+      const name = box.querySelector(".comment-name").value.trim() || "مشارك";
+      const text = box.querySelector(".comment-text").value.trim();
+      if (!text) { toast("اكتب تعليقك أولاً"); return; }
+      const all = getComments();
+      all.push({ key: box.dataset.key, name, text, date: new Date().toLocaleString("ar-EG") });
+      store.set("comments", all);
+      box.outerHTML = commentsHTML(box.dataset.key);
+      toast("تم نشر تعليقك");
       return;
     }
     if (a === "match-details") {
@@ -816,6 +936,7 @@
       a.classList.toggle("active", parts[0] === seg || (parts[0] === "news" && seg === "news"));
     });
 
+    renderLeagueTabs();
     const key = parts[0] || "home";
     if (key === "home") renderHome();
     else if (key === "news") parts[1] ? renderArticle(parts[1]) : renderNewsPage(query);

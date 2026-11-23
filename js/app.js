@@ -186,11 +186,11 @@
     const map = {
       "المباريات": "#/matches", "الأخبار": "#/news", "دوريات وبطولات": "#/leagues",
       "مالتيميديا": "#/media", "الانتقالات": "#/transfers", "فانتازي": "#/fantasy",
-      "الدوري المصري": "#/leagues?league=الدوري%20المصري", "الدوري الإنجليزي": "#/leagues?league=الدوري%20الإنجليزي",
+      "الدوري المصري": "#/egypt", "الدوري الإنجليزي": "#/leagues?league=الدوري%20الإنجليزي",
       "الدوري الإسباني": "#/leagues?league=الدوري%20الإسباني", "دوري أبطال أفريقيا": "#/leagues?league=دوري%20أبطال%20أفريقيا",
       "الدوري السعودي": "#/leagues?league=الدوري%20السعودي", "من نحن": "#/about",
       "اتصل بنا": "#/contact", "للإعلان معنا": "#/advertise", "سياسة الخصوصية": "#/policy",
-      "المصادر الرسمية": "#/sources"
+      "المصادر الرسمية": "#/sources", "الناقلون الرسميون": "#/broadcasters"
     };
     return map[label] || "#/";
   }
@@ -439,6 +439,7 @@
       <div class="page-head"><div class="breadcrumb"><a href="#/">الرئيسية</a> ‹ <span>المصادر الرسمية</span></div>
         <h1>المصادر الرسمية والفيديو القانوني</h1>
         <p>مصادر تم التحقق منها توفر فيديو رسمياً أو بيانات برخصة مجانية. الموقع يضمّن فقط ما يسمح صاحبه بتضمينه، ولا يعيد بث مباريات محجوزة الحقوق.</p></div>
+      <section class="section"><a class="source-link" href="#/broadcasters">📺 دليل الناقلين الرسميين — من يملك حقوق بث كل بطولة؟ ↗</a></section>
       <section class="section">${sectionHead("فيديوهات رسمية قابلة للتضمين")}
         ${officialVideosHTML(7)}
         <p class="modal-note" style="margin-top:12px">الفيديو يُعرض عبر مشغّل يوتيوب الرسمي (youtube-nocookie) من القناة صاحبة الحقوق. قد تظهر قيود جغرافية حسب سياسة يوتيوب أو الناشر.</p>
@@ -451,6 +452,131 @@
         <p>«مجاني» لا تعني دائماً «حرّ الحقوق». بعض القنوات الرسمية تسمح بالمشاهدة والتضمين عبر يوتيوب فقط، بينما ترخص ويكيميديا كومنز وOpen-Meteo إعادة الاستخدام مع ذكر المصدر. لا نستخدم أي رابط بث غير موثّق أو غير مصرّح بتضمينه.</p>
         <p>بيانات النتائج من ESPN، والشعارات والتشكيلات وقنوات البث من TheSportsDB (مفتاح مجاني 123)، والطقس من Open-Meteo برخصة CC BY 4.0.</p>
       </div></section>`;
+  }
+
+  /* ---------- دليل الناقلين الرسميين (حقوق البث) ---------- */
+  function renderBroadcastersPage() {
+    const list = window.KORA_BROADCASTERS || [];
+    view.innerHTML = `
+      <div class="page-head"><div class="breadcrumb"><a href="#/">الرئيسية</a> ‹ <span>الناقلون الرسميون</span></div>
+        <h1>دليل الناقلين الرسميين وحقوق البث</h1>
+        <p>من يملك حقوق بث كل بطولة في منطقتنا؟ ولماذا لا يوجد مصدر واحد لكل المباريات؟</p></div>
+      <section class="section"><div class="card rights-note">
+        <h3 style="margin-top:0">لماذا لا يوجد «مصدر واحد لكل المباريات»؟</h3>
+        <p>لأن حقوق البث مقسّمة بين ناقلين مختلفين حسب <b>البطولة + الدولة + الموسم + باقة الاشتراك</b>: beIN وTOD، وSSC وثمانية، وأبوظبي الرياضية، والرياضية المغربية، وON Sport وغيرها. أي موقع يعدك ببث كل المباريات مجاناً من مصدر واحد هو غالباً موقع غير مرخّص يجمع روابط خارجية متغيرة — ونحن لا نتعامل مع هذه المواقع.</p>
+        <p>yallaakora وسيط إخباري فقط: نرصد النتائج والأحداث والتغطية النصية، ونرشدك إلى <b>الناقل الرسمي صاحب الحق</b> للمشاهدة الكاملة. لا ننشر أي مادة مقرصنة، ولا نتحمل مسؤولية مواقع لا نملكها أو نديرها.</p>
+      </div></section>
+      <section class="section">${sectionHead("الناقلون الرسميون في المنطقة")}
+        <div class="broadcasters-grid">${list.map((b) => `<article class="broadcaster-card card">
+          <div class="broadcaster-head"><h3>${esc(b.name)}</h3><span class="source-tag">${esc(b.region)}</span></div>
+          <ul class="broadcaster-comps">${b.comps.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>
+          <div class="source-links">${b.platforms.map((p) => `<a class="source-link" href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.label)} ↗</a>`).join("")}</div>
+          <p class="broadcaster-note">${esc(b.note)}</p>
+        </article>`).join("")}</div>
+      </section>
+      <section class="section"><div class="card" style="padding:20px;line-height:2;color:var(--ink-2)">
+        <h3 style="margin-top:0">كيف تتابع المباراة بشكل قانوني؟</h3>
+        <p>1) افتح <a href="#/matches">صفحة المباريات</a> واختر مباراتك — ستجد القناة الناقلة الرسمية إن كانت متاحة في مصدر البيانات. 2) تابع <b>النقل المباشر النصي دقيقة بدقيقة</b> داخل مركز المباراة مجاناً. 3) للمشاهدة الكاملة، انتقل إلى منصة الناقل الرسمي المذكورة أعلاه عبر اشتراكه. 4) للملخصات والأهداف المجانية، زر <a href="#/sources">صفحة المصادر الرسمية</a>.</p>
+        <p class="modal-note">هذا الدليل إرشادي وقد تتغير الحقوق حسب الموسم والاتفاقيات؛ المرجع النهائي هو إعلان الناقل نفسه.</p>
+      </div></section>`;
+  }
+
+  /* ---------- الدوري المصري الممتاز (TheSportsDB) ---------- */
+  const EGY_LEAGUE_ID = "4829";
+
+  async function loadEgyptData() {
+    const cached = store.get("egy_v1", null);
+    if (cached && Date.now() - cached.at < 6 * 3600e3) return cached.data;
+    const base = "https://www.thesportsdb.com/api/v1/json/123/";
+    const [next, past, season] = await Promise.allSettled([
+      tsdb(base + "eventsnextleague.php?id=" + EGY_LEAGUE_ID),
+      tsdb(base + "eventspastleague.php?id=" + EGY_LEAGUE_ID),
+      tsdb(base + "eventsseason.php?id=" + EGY_LEAGUE_ID + "&s=2026-2027")
+    ]);
+    const all = [];
+    [next, past, season].forEach((r) => {
+      if (r.status === "fulfilled" && r.value && r.value.events) all.push(...r.value.events);
+    });
+    const seen = new Set();
+    const events = all.filter((e) => e && e.idEvent && !seen.has(e.idEvent) && seen.add(e.idEvent));
+    const upcoming = events.filter((e) => e.intHomeScore == null || e.intHomeScore === "")
+      .sort((a, b) => String(a.strTimestamp || a.dateEvent).localeCompare(String(b.strTimestamp || b.dateEvent)));
+    const results = events.filter((e) => e.intHomeScore != null && e.intHomeScore !== "")
+      .sort((a, b) => String(b.strTimestamp || b.dateEvent).localeCompare(String(a.strTimestamp || a.dateEvent)));
+    const names = [...new Set(events.flatMap((e) => [e.strHomeTeam, e.strAwayTeam]).filter(Boolean))];
+    let nameMap = {};
+    try {
+      if (window.KORA_LIVE && window.KORA_LIVE.translate && names.length) {
+        const tr = await window.KORA_LIVE.translate(names);
+        names.forEach((n, i) => { nameMap[n] = tr[i] || n; });
+      }
+    } catch (_) {}
+    const data = { upcoming: upcoming.slice(0, 8), results: results.slice(0, 20), nameMap: nameMap };
+    store.set("egy_v1", { at: Date.now(), data: data });
+    return data;
+  }
+
+  function egyTeamName(data, raw) {
+    return (data.nameMap && data.nameMap[raw]) || raw || "فريق";
+  }
+
+  function egyDate(e) {
+    const d = new Date(e.strTimestamp || e.dateEvent);
+    if (isNaN(d)) return e.dateEvent || "";
+    return d.toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long" }) + " · " +
+      d.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function egyMatchCard(data, e, withScore) {
+    const hn = egyTeamName(data, e.strHomeTeam), an = egyTeamName(data, e.strAwayTeam);
+    return `<div class="egy-card card">
+      <div class="egy-teams">
+        <span class="egy-team">${e.strHomeTeamBadge ? `<img src="${esc(e.strHomeTeamBadge)}" alt="" loading="lazy" onerror="this.remove()">` : ""}<b>${esc(hn)}</b></span>
+        <span class="egy-score">${withScore ? esc(e.intHomeScore) + " - " + esc(e.intAwayScore) : "VS"}</span>
+        <span class="egy-team">${e.strAwayTeamBadge ? `<img src="${esc(e.strAwayTeamBadge)}" alt="" loading="lazy" onerror="this.remove()">` : ""}<b>${esc(an)}</b></span>
+      </div>
+      <div class="egy-meta"><span>${esc(egyDate(e))}</span>${e.intRound ? `<span>الجولة ${esc(e.intRound)}</span>` : ""}${e.strStatus ? `<span>${esc(e.strStatus === "FT" ? "انتهت" : e.strStatus)}</span>` : ""}</div>
+    </div>`;
+  }
+
+  async function renderEgyptPage() {
+    view.innerHTML = `
+      <div class="page-head"><div class="breadcrumb"><a href="#/">الرئيسية</a> ‹ <span>الدوري المصري</span></div>
+        <h1>الدوري المصري الممتاز</h1>
+        <p>مواعيد ونتائج وجولات الدوري المصري — بيانات حية من TheSportsDB</p></div>
+      <div id="egyBox"><p class="modal-note">جارٍ جلب بيانات الدوري المصري...</p></div>`;
+    const box = document.getElementById("egyBox");
+    try {
+      const data = await loadEgyptData();
+      if (!data.upcoming.length && !data.results.length) throw new Error("empty");
+      box.innerHTML = `
+        ${data.upcoming.length ? `<section class="section">${sectionHead("المباريات القادمة")}
+          <div class="egy-grid">${data.upcoming.map((e) => egyMatchCard(data, e, false)).join("")}</div></section>` : ""}
+        ${data.results.length ? `<section class="section">${sectionHead("أحدث النتائج")}
+          <div class="egy-grid">${data.results.map((e) => egyMatchCard(data, e, true)).join("")}</div></section>` : ""}
+        <section class="section"><div class="card" style="padding:18px;line-height:2;color:var(--ink-2)">
+          <p style="margin:0">📺 الناقل المحلي الأبرز للدوري المصري هو <b>ON Sport</b> — <a href="#/broadcasters" data-action="goto-broadcasters">دليل الناقلين الرسميين</a>. البيانات من TheSportsDB (مفتاح مجاني 123) وقد تتأخر بعض الجولات عن التحديث.</p>
+        </div></section>`;
+    } catch (err) {
+      console.warn("Egypt league unavailable:", err);
+      box.innerHTML = `<div class="empty-state card"><span class="emoji">🇪🇬</span>تعذر جلب بيانات الدوري المصري حالياً. حاول التحديث لاحقاً.</div>`;
+    }
+  }
+
+  async function fillEgyptHome() {
+    const box = document.getElementById("egyHomeBox");
+    if (!box) return;
+    try {
+      const data = await loadEgyptData();
+      const next = data.upcoming[0];
+      const last = data.results[0];
+      const pick = next || last;
+      if (!pick) { box.innerHTML = `<p class="modal-note">لا توجد مباريات متاحة حالياً.</p>`; return; }
+      box.innerHTML = egyMatchCard(data, pick, !next) +
+        `<a class="load-more" href="#/egypt" style="margin-top:10px">كل مباريات الدوري المصري ←</a>`;
+    } catch (_) {
+      box.innerHTML = `<p class="modal-note">تعذر جلب بيانات الدوري المصري حالياً.</p>`;
+    }
   }
 
   /* ---------- views ---------- */
@@ -506,6 +632,10 @@
             </div>
           </div>
         </div>
+      </section>
+      <section class="section">
+        ${sectionHead("الدوري المصري الممتاز", "#/egypt", "كل المباريات")}
+        <div id="egyHomeBox"><p class="modal-note">جارٍ جلب بيانات الدوري المصري...</p></div>
       </section>
       <section class="section">
         ${sectionHead("فيديو رسمي مجاني", "#/sources", "كل المصادر")}
@@ -628,9 +758,9 @@
       transfers: ["سوق الانتقالات", "آخر الصفقات والشائعات", () => `<div class="news-list">${D.news.filter((n) => n.category === "الانتقالات" || n.id === "n3" || n.id === "n14").map(newsRow).join("")}</div>`],
       stats: ["الإحصائيات", "أرقام وترتيبات الدوريات", () => statsHTML()],
       fantasy: ["فانتازي", "دليلك للجولة القادمة", () => `<div class="news-list">${D.news.filter((n) => n.category === "فانتازي").map(newsRow).join("")}</div>`],
-      about: ["من نحن", "منصة عربية للإعلام الرياضي", () => `<div class="card" style="padding:24px;line-height:2;color:var(--ink-2)"><p>yallaakora منصة رياضية عربية تهدف إلى تقديم أخبار كرة القدم والرياضات الأخرى بصورة سريعة وموثوقة، مع تغطية المباريات والنتائج المباشرة والتحليلات.</p><p>نسعى إلى توفير تجربة استخدام سهلة على كل الأجهزة، مع محتوى متجدد على مدار اليوم.</p></div>`],
+      about: ["من نحن", "منصة عربية للإعلام الرياضي", () => `<div class="card" style="padding:24px;line-height:2;color:var(--ink-2)"><p>yallaakora منصة رياضية عربية تهدف إلى تقديم أخبار كرة القدم والرياضات الأخرى بصورة سريعة وموثوقة، مع تغطية المباريات والنتائج المباشرة والتحليلات.</p><p>«النقل المباشر» في yallaakora هو تغطية نصية لحظية دقيقة بدقيقة — أحداث وأهداف وإحصائيات ومواعيد وأخبار — وليس بالضرورة بثاً مرئياً كاملاً للمباراة. حقوق البث المرئي الكاملة ملك للناقلين الرسميين، ونرشدك إليهم عبر <a href="#/broadcasters">دليل الناقلين الرسميين</a>.</p><p>نسعى إلى توفير تجربة استخدام سهلة على كل الأجهزة، مع محتوى متجدد على مدار اليوم.</p></div>`],
       contact: ["اتصل بنا", "نسمع رأيك دائماً", () => `<div class="card" style="padding:24px"><p>للتواصل مع فريق التحرير: <b>hello@koralive.example</b></p><p>للإعلانات والشراكات: <b>ads@koralive.example</b></p></div>`],
-      policy: ["سياسة الخصوصية", "كيف نستخدم بياناتك", () => `<div class="card" style="padding:24px;line-height:2;color:var(--ink-2)"><p>نحن نحترم خصوصيتك. البيانات التي تدخلها مثل بريدك الإلكتروني تُحفظ محلياً على جهازك لأغراض الاشتراك في الإشعارات فقط، ولا يتم مشاركتها مع أي طرف ثالث.</p></div>`],
+      policy: ["سياسة الخصوصية والمحتوى", "كيف نستخدم بياناتك ونحمي الحقوق", () => `<div class="card" style="padding:24px;line-height:2;color:var(--ink-2)"><h3 style="margin-top:0">خصوصيتك</h3><p>نحن نحترم خصوصيتك. البيانات التي تدخلها مثل بريدك الإلكتروني تُحفظ محلياً على جهازك لأغراض الاشتراك في الإشعارات فقط، ولا يتم مشاركتها مع أي طرف ثالث.</p><h3>سياسة المحتوى وحقوق النشر</h3><p>لا يتم نشر أي محتوى إلا بعد التأكد من مصدره القانوني، ونرفض نشر أي مواد مقرصنة. الفيديوهات المضمّنة في الموقع تأتي من قنوات رسمية صاحبة الحقوق عبر مشغّل يوتيوب الرسمي فقط، دون تنزيل أو إعادة بث.</p><p>حقوق البث المرئي الكاملة للمباريات مملوكة للناقلين الرسميين (beIN وTOD، SSC وثمانية، أبوظبي الرياضية، الرياضية المغربية، ON Sport وغيرهم) بحسب البطولة والدولة والموسم. yallaakora وسيط إخباري يرشدك إلى الناقل الرسمي ولا يبث مباريات محجوزة الحقوق.</p><p>الموقع غير مسؤول عن أي مواقع أو روابط خارجية لا يملكها أو يديرها، بما فيها المواقع التي تنتحل أسماء مشابهة وتجمع روابط بث غير مرخّصة.</p><p>بيانات النتائج والأحداث من ESPN، والشعارات والتشكيلات من TheSportsDB، وبيانات الطقس من Open-Meteo برخصة CC BY 4.0 مع ذكر المصدر.</p></div>`],
       advertise: ["للإعلان معنا", "مساحتك أمام جمهور رياضي واسع", () => `<div class="card" style="padding:24px;line-height:2"><p>تواصل مع فريق الإعلانات عبر <b>ads@koralive.example</b> لمعرفة الباقات المتاحة.</p></div>`],
       app: ["تطبيق yallaakora", "كل الكرة في جيبك", () => `<div class="card" style="padding:30px;text-align:center"><div style="font-size:50px">⚽</div><h3 style="margin-block:10px">حمل التطبيق الآن</h3><p style="color:var(--muted)">تابع النتائج المباشرة والإشعارات أينما كنت.</p></div>`]
     };
@@ -747,6 +877,65 @@
     }
   }
 
+  /* ---------- النقل المباشر النصي: دقيقة بدقيقة ---------- */
+  function commentaryIcon(t) {
+    if (/goal|penalty/i.test(t)) return "⚽";
+    if (/red/i.test(t)) return "🟥";
+    if (/yellow/i.test(t)) return "🟨";
+    if (/sub/i.test(t)) return "↔";
+    if (/corner/i.test(t)) return "🚩";
+    if (/foul/i.test(t)) return "⚠️";
+    if (/offside/i.test(t)) return "🚫";
+    if (/save/i.test(t)) return "🧤";
+    return "•";
+  }
+
+  function commentaryHTML(m, data) {
+    const head = `<div class="cm-head">
+      <span class="cm-live ${m.status === "live" ? "on" : ""}">${m.status === "live" ? "🔴 تغطية حية" : "📝 تغطية نصية"}</span>
+      <span class="cm-src">دقيقة بدقيقة · المصدر: ESPN</span>
+      ${m.status === "live" ? `<button class="cm-refresh" data-action="commentary-refresh" data-id="${esc(m.id)}">⟳ تحديث</button>` : ""}
+    </div>`;
+    const tv = data.broadcasts && data.broadcasts.length
+      ? `<p class="modal-note">الناقلون المرصودين في مصدر البيانات: ${data.broadcasts.map(esc).join(" · ")} — <a href="#/broadcasters" data-action="goto-broadcasters">دليل الناقلين الرسميين</a></p>`
+      : "";
+    if (!data.items.length) {
+      return head + tv + `<p class="modal-note">التغطية النصية غير متاحة لهذه المباراة حالياً في مصدر البيانات. يمكنك متابعة تبويب «أحداث المباراة» للأهداف والبطاقات.</p>`;
+    }
+    const rows = data.items.map((x) => `<div class="cm-row ${/goal|penalty/i.test(x.type) ? "is-goal" : ""}">
+      <span class="cm-min">${esc(x.min || (x.period ? "ش" + x.period : "—"))}</span>
+      <span class="cm-ico">${commentaryIcon(x.type)}</span>
+      <p class="cm-text">${esc(x.text)}</p>
+    </div>`).join("");
+    return head + tv + `<div class="cm-list">${rows}</div>
+      <p class="modal-note">أحدث ${data.items.length} تعليقاً · التغطية النصية بديل قانوني عن البث المرئي، وحقوق الفيديو الكاملة للناقل الرسمي.</p>`;
+  }
+
+  async function loadCommentary(box, m, force) {
+    const key = "commentary_" + m.id;
+    const cached = store.get(key, null);
+    const ttl = m.status === "live" ? 60e3 : 12 * 3600e3;
+    if (!force && cached && Date.now() - cached.at < ttl) {
+      box.innerHTML = commentaryHTML(m, cached.data);
+      return;
+    }
+    box.innerHTML = `<p class="modal-note">جارٍ جلب التغطية النصية دقيقة بدقيقة...</p>`;
+    const eventId = String(m.id).split("-")[2] || "";
+    try {
+      if (!window.KORA_LIVE || !window.KORA_LIVE.commentary || !m.leagueKey || !eventId) throw new Error("no-source");
+      const data = await window.KORA_LIVE.commentary(m.leagueKey, eventId);
+      store.set(key, { at: Date.now(), data: data });
+      box.innerHTML = commentaryHTML(m, data);
+    } catch (err) {
+      console.warn("Commentary unavailable:", m.id, err);
+      if (cached && cached.data) {
+        box.innerHTML = commentaryHTML(m, cached.data) + `<p class="modal-note">تعذر التحديث الآن — يتم عرض آخر نسخة محفوظة.</p>`;
+      } else {
+        box.innerHTML = `<p class="modal-note">التغطية النصية غير متوفرة لهذه المباراة حالياً. تابع تبويب «أحداث المباراة» أو عد لاحقاً.</p>`;
+      }
+    }
+  }
+
   function matchCenter(m, h, a) {
     const events = (m.details || []).slice().reverse();
     const typeOf = (d) => String((d.type && d.type.text) || "");
@@ -773,7 +962,8 @@
         <button class="follow-btn ${isFav(m.away) ? "active" : ""}" data-action="follow-team" data-id="${esc(m.away)}" data-name="${esc(a.name)}">${isFav(m.away) ? "⭐ متابَع" : "☆ متابعة"} ${esc(a.code)}</button>
       </div>
       <button class="vote-btn" data-action="rate-player" style="margin-top:14px">اختر رجل المباراة</button>
-      ${m.link ? `<a class="vote-btn" style="display:block;text-align:center;margin-top:10px;text-decoration:none" href="${esc(m.link)}" target="_blank" rel="noopener">المشاهدة الرسمية / المصدر ↗</a>` : `<p class="modal-note" style="margin-top:10px">المشاهدة الكاملة تخضع لحقوق النقل.</p>`}`;
+      ${m.link ? `<a class="vote-btn" style="display:block;text-align:center;margin-top:10px;text-decoration:none" href="${esc(m.link)}" target="_blank" rel="noopener">المشاهدة الرسمية / المصدر ↗</a>` : `<p class="modal-note" style="margin-top:10px">المشاهدة الكاملة تخضع لحقوق النقل.</p>`}
+      <a class="source-link" style="margin-top:10px" href="#/broadcasters" data-action="goto-broadcasters">📺 دليل الناقلين الرسميين — من يملك حقوق هذه البطولة؟</a>`;
 
     const eventList = events.length
       ? events.slice(0, 20).map((d) => {
@@ -797,12 +987,14 @@
     return `<div class="match-center">
       <div class="mc-tabs" role="tablist">
         <button class="mc-tab active" data-action="match-tab" data-tab="summary">الملخص</button>
+        <button class="mc-tab" data-action="match-tab" data-tab="live">النقل المباشر</button>
         <button class="mc-tab" data-action="match-tab" data-tab="events">أحداث المباراة</button>
         <button class="mc-tab" data-action="match-tab" data-tab="stats">الإحصائيات</button>
         <button class="mc-tab" data-action="match-tab" data-tab="lineups">التشكيلات</button>
         <button class="mc-tab" data-action="match-tab" data-tab="comments">آراء القرّاء</button>
       </div>
       <div class="mc-panel active" data-panel="summary">${summary}</div>
+      <div class="mc-panel" data-panel="live"><div class="commentary-box" data-match="${esc(m.id)}"><p class="modal-note">اضغط تبويب «النقل المباشر» لجلب التغطية النصية دقيقة بدقيقة.</p></div></div>
       <div class="mc-panel" data-panel="events">${eventList}</div>
       <div class="mc-panel" data-panel="stats">${stats}</div>
       <div class="mc-panel" data-panel="lineups"><div class="lineup-box" data-match="${esc(m.id)}"><p class="modal-note">اضغط تبويب «التشكيلات» لجلب التشكيل من المصدر.</p></div></div>
@@ -916,9 +1108,24 @@
             if (m) loadLineup(panel, m);
           }
         }
+        if (t.dataset.tab === "live") {
+          const panel = box.querySelector('[data-panel="live"] .commentary-box');
+          if (panel && panel.dataset.loaded !== "1") {
+            panel.dataset.loaded = "1";
+            const m = findMatch(panel.dataset.match);
+            if (m) loadCommentary(panel, m);
+          }
+        }
       }
       return;
     }
+    if (a === "commentary-refresh") {
+      const box = document.querySelector('.commentary-box[data-match="' + t.dataset.id + '"]');
+      const m = findMatch(t.dataset.id);
+      if (box && m) loadCommentary(box, m, true);
+      return;
+    }
+    if (a === "goto-broadcasters") { closeModal(); return; }
     if (a === "follow-team") {
       const id = String(t.dataset.id);
       const favs = getFavs();
@@ -1029,12 +1236,14 @@
 
     renderLeagueTabs();
     const key = parts[0] || "home";
-    if (key === "home") renderHome();
+    if (key === "home") { renderHome(); fillEgyptHome(); }
     else if (key === "news") parts[1] ? renderArticle(parts[1]) : renderNewsPage(query);
     else if (key === "matches") renderMatchesPage();
     else if (key === "leagues") renderLeagues(query);
     else if (key === "search") renderSearchPage(query);
     else if (key === "sources") renderSourcesPage();
+    else if (key === "broadcasters") renderBroadcastersPage();
+    else if (key === "egypt") renderEgyptPage();
     else renderSimplePage(key);
 
     if (location.hash !== "#/") window.scrollTo({ top: 0, behavior: "auto" });

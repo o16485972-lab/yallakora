@@ -393,5 +393,31 @@
     };
   }
 
-  window.KORA_LIVE = { load: load, leagues: LEAGUES };
+  /* ---------- النقل المباشر النصي (دقيقة بدقيقة) ----------
+     يجلب تعليقات المباراة الحية من ESPN ويترجمها للعربية،
+     مع أسماء الناقلين الرسميين المتاحة في نفس الاستجابة. */
+  async function commentary(leagueKey, eventId) {
+    const j = await fetchJSON(SITE + leagueKey + "/summary?event=" + encodeURIComponent(eventId));
+    const items = (j.commentary || []).map((c) => {
+      const play = c.play || {};
+      const min = (play.clock && play.clock.displayValue) || (c.time && c.time.displayValue) || "";
+      return {
+        seq: c.sequence || 0,
+        min: min,
+        period: (play.period && play.period.number) || 0,
+        type: (play.type && play.type.text) || "",
+        text: c.text || play.text || ""
+      };
+    }).filter((x) => x.text);
+    items.sort((a, b) => b.seq - a.seq);
+    const top = items.slice(0, 60);
+    const translated = await translateAll(top.map((x) => x.text));
+    top.forEach((x, i) => { x.text = translated[i] || x.text; });
+    const broadcasts = [...new Set((j.broadcasts || [])
+      .map((b) => (b.media && (b.media.name || b.media.shortName)) || "")
+      .filter(Boolean))];
+    return { items: top, broadcasts: broadcasts };
+  }
+
+  window.KORA_LIVE = { load: load, leagues: LEAGUES, commentary: commentary, translate: translateAll };
 })();

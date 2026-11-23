@@ -619,3 +619,42 @@ html[dir="ltr"] .more-link::before { content: "→"; }
 @media (max-width: 600px) {
   .official-grid, .sources-grid { grid-template-columns: 1fr; }
 }
+
+/* ---------- النقل المباشر النصي (دقيقة بدقيقة) ---------- */
+.cm-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.cm-live { font-size: 12px; font-weight: 800; color: var(--muted); background: var(--surface-2); border: 1px solid var(--line); padding: 4px 10px; border-radius: 999px; }
+.cm-live.on { color: #fff; background: var(--live); border-color: var(--live); }
+.cm-src { font-size: 11px; color: var(--muted); font-weight: 700; }
+.cm-refresh { margin-inline-start: auto; background: var(--primary-soft); color: var(--primary); border: 0; border-radius: 8px; padding: 5px 12px; font-size: 11.5px; font-weight: 800; cursor: pointer; }
+.cm-refresh:hover { background: var(--primary); color: #fff; }
+.cm-list { max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-inline-end: 4px; }
+.cm-row { display: flex; gap: 10px; align-items: flex-start; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.cm-row.is-goal { background: var(--primary-soft); border-color: #f6c6cb; }
+.cm-min { flex: 0 0 44px; text-align: center; font-size: 11.5px; font-weight: 800; color: var(--primary); background: #fff; border: 1px solid var(--line); border-radius: 7px; padding: 2px 4px; margin-top: 2px; }
+.cm-ico { flex: 0 0 auto; font-size: 14px; margin-top: 2px; }
+.cm-text { margin: 0; font-size: 12.5px; line-height: 1.8; color: var(--ink-2); }
+
+/* ---------- دليل الناقلين الرسميين ---------- */
+.rights-note { padding: 22px; line-height: 2; color: var(--ink-2); border-inline-start: 4px solid var(--primary); }
+.rights-note p { margin: 8px 0; }
+.broadcasters-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.broadcaster-card { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.broadcaster-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.broadcaster-head h3 { margin: 0; font-size: 16px; font-weight: 800; }
+.broadcaster-comps { margin: 0; padding: 0 18px 0 0; display: flex; flex-direction: column; gap: 5px; }
+.broadcaster-comps li { font-size: 12.5px; line-height: 1.8; color: var(--ink-2); }
+.broadcaster-comps li::marker { color: var(--primary); }
+.broadcaster-note { margin: 0; font-size: 11.5px; line-height: 1.9; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 10px; }
+@media (max-width: 700px) { .broadcasters-grid { grid-template-columns: 1fr; } }
+
+/* ---------- الدوري المصري ---------- */
+.egy-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.egy-card { padding: 16px 18px; }
+.egy-teams { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.egy-team { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.egy-team:last-child { flex-direction: row-reverse; text-align: left; }
+.egy-team img { width: 34px; height: 34px; object-fit: contain; flex: 0 0 auto; }
+.egy-team b { font-size: 13px; font-weight: 800; line-height: 1.5; }
+.egy-score { flex: 0 0 auto; font-size: 16px; font-weight: 800; color: var(--primary); background: var(--primary-soft); border-radius: 9px; padding: 4px 12px; }
+.egy-meta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 11px; color: var(--muted); font-weight: 700; }
+@media (max-width: 700px) { .egy-grid { grid-template-columns: 1fr; } }

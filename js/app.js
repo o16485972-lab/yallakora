@@ -28,6 +28,42 @@
   const img = (src, alt, cls) =>
     `<div class="img-wrap ${cls || ""}"><img src="${esc(src)}" alt="${esc(alt)}" loading="lazy" onerror="this.style.display='none'"></div>`;
 
+  function streamEmbed(url) {
+    if (!url) return "";
+    const u = String(url).trim();
+    const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|live\/|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/i);
+    const isHls = /\.m3u8(\?|$)/i.test(u);
+    if (yt) {
+      return `<div class="stream-player"><iframe src="https://www.youtube.com/embed/${yt[1]}?rel=0" title="بث المباراة" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
+    }
+    if (isHls) {
+      return `<div class="stream-player"><video id="liveStreamVideo" data-src="${esc(u)}" controls playsinline></video></div>`;
+    }
+    if (/^https?:\/\//i.test(u)) {
+      return `<div class="stream-player"><iframe src="${esc(u)}" title="بث المباراة" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
+    }
+    return "";
+  }
+
+  function initStreamPlayer() {
+    const v = document.getElementById("liveStreamVideo");
+    if (!v) return;
+    const url = v.dataset.src;
+    if (!url) return;
+    if (v.canPlayType("application/vnd.apple.mpegurl")) { v.src = url; return; }
+    if (window.Hls && window.Hls.isSupported()) {
+      const hls = new window.Hls(); hls.loadSource(url); hls.attachMedia(v); return;
+    }
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js";
+    s.onload = () => {
+      if (window.Hls && window.Hls.isSupported()) {
+        const hls = new window.Hls(); hls.loadSource(url); hls.attachMedia(v);
+      }
+    };
+    document.head.appendChild(s);
+  }
+
   const badge = (team, cls) => {
     const t = typeof team === "string" ? D.teams[team] : team;
     if (!t) return "";
@@ -536,6 +572,7 @@
     modalRoot.innerHTML = `<div class="modal"><div class="modal-head"><h3 id="modalTitle">${esc(title || "التفاصيل")}</h3><button data-action="modal-close" aria-label="إغلاق">✕</button></div><div class="modal-body">${html}</div></div>`;
     modalRoot.classList.add("open");
     modalRoot.setAttribute("aria-hidden", "false");
+    initStreamPlayer();
   }
   function closeModal() {
     modalRoot.classList.remove("open");
@@ -556,7 +593,7 @@
     if (!m) return;
     const h = D.teams[m.home], a = D.teams[m.away];
     openModal(`
-      ${img(D.IMG.match1, "المباراة", "modal-hero")}
+      ${streamEmbed(m.streamUrl) || img(D.IMG.match1, "المباراة", "modal-hero")}
       <div style="font-size:12px;color:var(--muted);font-weight:800;margin-bottom:10px">${esc(m.league)}</div>
       <div class="modal-match-score">
         <div class="tm">${badge(h)}<span>${esc(h.name)}</span></div>

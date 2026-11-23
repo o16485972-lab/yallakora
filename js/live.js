@@ -133,6 +133,7 @@
           minute: st === "live" ? ((ev.status && (ev.status.displayClock || (ev.status.type && ev.status.type.shortDetail))) || "الآن") : "",
           leagueKey: r.league.key,
           link: (ev.links && ev.links[0] && ev.links[0].href) || "",
+          streamUrl: ((window.KORA_STREAMS || {})[r.league.key]) || "",
           details: comp.details || []
         });
       });

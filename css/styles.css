@@ -449,6 +449,8 @@ html[dir="ltr"] .more-link::before { content: "→"; }
 .modal-head button { border: 0; background: var(--surface-2); width: 32px; height: 32px; border-radius: 8px; font-size: 14px; }
 .modal-body { padding: 18px; }
 .modal-body .modal-hero { height: 190px; border-radius: 11px; margin-bottom: 14px; }
+.stream-player { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #0b1220; border-radius: 11px; overflow: hidden; margin-bottom: 14px; }
+.stream-player iframe, .stream-player video { width: 100%; height: 100%; border: 0; display: block; }
 .modal-match-score { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 14px; background: var(--surface-2); border-radius: 11px; margin-bottom: 14px; }
 .modal-match-score .tm { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; }
 .modal-match-score .sc { font-size: 26px; font-weight: 900; }

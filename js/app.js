@@ -21,6 +21,117 @@
     toastTimer: null
   };
 
+  /* ================= الميزات الجديدة ================= */
+  const CFG = window.KORA_CONFIG || {};
+  const CITIES = (CFG.cities && CFG.cities.length) ? CFG.cities : [{ key: "cairo", label: "القاهرة", tz: "Africa/Cairo" }];
+  const getCity = () => CITIES.find((c) => c.key === store.get("city", CFG.defaultCity || "cairo")) || CITIES[0];
+  const cityTime = (iso, fallback) => {
+    if (!iso) return fallback || "";
+    const d = new Date(iso);
+    if (isNaN(d)) return fallback || "";
+    try { return new Intl.DateTimeFormat("ar-EG", { hour: "2-digit", minute: "2-digit", timeZone: getCity().tz }).format(d); }
+    catch (_) { return fallback || ""; }
+  };
+  const matchTime = (m) => cityTime(m && m.iso, m && m.time);
+
+  /* --- نظام النقاط والمستويات --- */
+  const LEVELS = [
+    { at: 0, name: "مشجع جديد", badge: "⚽" },
+    { at: 25, name: "متابع شغوف", badge: "🔥" },
+    { at: 75, name: "خبير كرة", badge: "🎯" },
+    { at: 150, name: "أسطورة المدرجات", badge: "🏆" }
+  ];
+  const getPoints = () => Number(store.get("points", 0)) || 0;
+  const levelInfo = () => {
+    const p = getPoints();
+    let lvl = LEVELS[0];
+    LEVELS.forEach((x) => { if (p >= x.at) lvl = x; });
+    const next = LEVELS.find((x) => x.at > p);
+    return { ...lvl, points: p, next: next ? next.at : null };
+  };
+  function award(n, reason) {
+    if (!n || n <= 0) return;
+    store.set("points", getPoints() + n);
+    toast("+" + n + " نقطة · " + reason);
+  }
+
+  /* --- إشعارات المتصفح (تعمل أثناء فتح الموقع) --- */
+  const notifyOn = () => "Notification" in window && Notification.permission === "granted" && store.get("notify_on", false);
+  function pushNotify(title, body) {
+    if (!notifyOn()) return;
+    try { new Notification(title, { body: body, icon: "./icon.svg", badge: "./icon.svg", tag: "kora" + Date.now() }); }
+    catch (_) {}
+  }
+  function checkKickoffs() {
+    if (!notifyOn()) return;
+    const favs = getFavs();
+    const sent = store.get("notified", []);
+    const now = Date.now();
+    const before = Number((CFG.notifications || {}).minutesBefore || 15) * 60000;
+    const soon = [...((D.matches && D.matches.today) || []), ...((D.matches && D.matches.tomorrow) || [])]
+      .filter((m) => {
+        const t = m.iso ? Date.parse(m.iso) : 0;
+        return t && t - now > 0 && t - now <= before && !sent.includes(m.id);
+      })
+      .filter((m) => !favs.length || favs.includes(String(m.home)) || favs.includes(String(m.away)));
+    if (!soon.length) return;
+    soon.forEach((m) => pushNotify("⚽ مباراة تبدأ قريباً", (D.teams[m.home] || {}).name + " × " + (D.teams[m.away] || {}).name + " — " + matchTime(m) + " · " + getCity().label));
+    store.set("notified", [...sent, ...soon.map((m) => m.id)].slice(-200));
+  }
+
+  /* --- SEO ديناميكي لكل صفحة ومقال --- */
+  function setSEO(o) {
+    o = o || {};
+    const title = o.title ? o.title + " | yallaakora" : "yallaakora | أخبار ومباريات ونتائج كرة القدم";
+    const desc = o.desc || "نتائج حية وأخبار وتغطية دقيقة بدقيقة لكل البطولات العربية والعالمية.";
+    document.title = title;
+    const setMeta = (sel, attr, val) => { const el = document.querySelector(sel); if (el) el.setAttribute(attr, val); };
+    setMeta('meta[name="description"]', "content", desc);
+    setMeta('meta[property="og:title"]', "content", title);
+    setMeta('meta[property="og:description"]', "content", desc);
+    setMeta('meta[property="og:type"]', "content", o.type || "website");
+    setMeta('meta[property="og:url"]', "content", location.href);
+    setMeta('meta[name="twitter:title"]', "content", title);
+    setMeta('meta[name="twitter:description"]', "content", desc);
+    if (o.image) {
+      setMeta('meta[property="og:image"]', "content", o.image);
+      setMeta('meta[name="twitter:image"]', "content", o.image);
+    }
+    setMeta('link[rel="canonical"]', "href", (CFG.siteUrl || location.origin) + location.pathname + location.hash);
+    let ld = document.getElementById("ldPage");
+    if (!ld) { ld = document.createElement("script"); ld.type = "application/ld+json"; ld.id = "ldPage"; document.head.appendChild(ld); }
+    ld.textContent = JSON.stringify(o.schema || {
+      "@context": "https://schema.org", "@type": "WebPage", "name": title,
+      "description": desc, "inLanguage": "ar", "url": location.href
+    });
+  }
+
+  /* --- مساحات إعلانية/رعاة (تُفعّل من config.js فقط) --- */
+  let adsStarted = false;
+  function initAds() {
+    const a = CFG.ads || {};
+    if (adsStarted || !a.enabled || !a.adsenseClient) return;
+    adsStarted = true;
+    const s = document.createElement("script");
+    s.id = "adsbygooglejs"; s.async = true;
+    s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=" + encodeURIComponent(a.adsenseClient);
+    s.crossOrigin = "anonymous";
+    s.onload = () => { document.querySelectorAll(".adsbygoogle").forEach(() => { try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (_) {} }); };
+    document.head.appendChild(s);
+  }
+  function adSlotHTML(slot) {
+    const a = CFG.ads || {};
+    if (a.enabled && a.adsenseClient && a.adsenseSlot) {
+      const id = slot || a.adsenseSlot;
+      return `<div class="ad-slot"><small>إعلان</small><ins class="adsbygoogle" style="display:block" data-ad-client="${esc(a.adsenseClient)}" data-ad-slot="${esc(id)}" data-ad-format="auto" data-full-width-responsive="true"></ins></div>`;
+    }
+    const sponsors = a.sponsors || [];
+    if (sponsors.length) {
+      return `<div class="sponsor-strip"><span>شركاء yallaakora</span>${sponsors.map((s) => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${s.logo ? `<img src="${esc(s.logo)}" alt="${esc(s.name)}">` : esc(s.name)}</a>`).join("")}</div>`;
+    }
+    return "";
+  }
+
   /* ---------- helpers ---------- */
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -29,21 +140,40 @@
   const img = (src, alt, cls) =>
     `<div class="img-wrap ${cls || ""}"><img src="${esc(src)}" alt="${esc(alt)}" loading="lazy" onerror="this.style.display='none'"></div>`;
 
+  function streamWrap(inner, extra) {
+    return `<div class="stream-wrap">${inner}<div class="stream-tools">${extra || ""}<button class="stream-fs" data-action="stream-fullscreen" title="ملء الشاشة" aria-label="ملء الشاشة">⛶</button></div></div>`;
+  }
+
   function streamEmbed(url) {
     if (!url) return "";
     const u = String(url).trim();
     const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|live\/|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/i);
     const isHls = /\.m3u8(\?|$)/i.test(u);
     if (yt) {
-      return `<div class="stream-player"><iframe src="https://www.youtube.com/embed/${yt[1]}?rel=0" title="بث المباراة" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
+      return streamWrap(`<iframe src="https://www.youtube-nocookie.com/embed/${yt[1]}?rel=0" title="بث المباراة" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe>`);
     }
     if (isHls) {
-      return `<div class="stream-player"><video id="liveStreamVideo" data-src="${esc(u)}" controls playsinline></video></div>`;
+      return streamWrap(`<video id="liveStreamVideo" data-src="${esc(u)}" controls playsinline></video>`,
+        `<select class="hls-quality" disabled aria-label="جودة البث"><option>تلقائي</option></select>`);
     }
     if (/^https?:\/\//i.test(u)) {
-      return `<div class="stream-player"><iframe src="${esc(u)}" title="بث المباراة" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
+      return streamWrap(`<iframe src="${esc(u)}" title="بث المباراة" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe>`);
     }
     return "";
+  }
+
+  function attachHls(url, v) {
+    if (window.__koraHls) { try { window.__koraHls.destroy(); } catch (_) {} }
+    const hls = new window.Hls();
+    window.__koraHls = hls;
+    hls.loadSource(url); hls.attachMedia(v);
+    hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+      const sel = document.querySelector(".hls-quality");
+      if (!sel || !hls.levels.length) return;
+      sel.innerHTML = `<option value="-1">تلقائي</option>` + hls.levels.map((l, i) =>
+        `<option value="${i}">${l.height ? l.height + "p" : "جودة " + (i + 1)}</option>`).join("");
+      sel.disabled = false;
+    });
   }
 
   function initStreamPlayer() {
@@ -52,16 +182,10 @@
     const url = v.dataset.src;
     if (!url) return;
     if (v.canPlayType("application/vnd.apple.mpegurl")) { v.src = url; return; }
-    if (window.Hls && window.Hls.isSupported()) {
-      const hls = new window.Hls(); hls.loadSource(url); hls.attachMedia(v); return;
-    }
+    if (window.Hls && window.Hls.isSupported()) { attachHls(url, v); return; }
     const s = document.createElement("script");
     s.src = "https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js";
-    s.onload = () => {
-      if (window.Hls && window.Hls.isSupported()) {
-        const hls = new window.Hls(); hls.loadSource(url); hls.attachMedia(v);
-      }
-    };
+    s.onload = () => { if (window.Hls && window.Hls.isSupported()) attachHls(url, v); };
     document.head.appendChild(s);
   }
 
@@ -127,6 +251,8 @@
     document.getElementById("todayDate").textContent =
       "اليوم، " + new Date().toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
     document.getElementById("copyYear").textContent = new Date().getFullYear();
+    const cityPill = document.getElementById("cityPill");
+    if (cityPill) cityPill.textContent = "📍 " + getCity().label;
 
     document.getElementById("mainNav").innerHTML = D.nav.map((n) =>
       `<a href="${n.href}" data-nav="${n.href}">${esc(n.label)}</a>`
@@ -190,7 +316,8 @@
       "الدوري الإسباني": "#/leagues?league=الدوري%20الإسباني", "دوري أبطال أفريقيا": "#/leagues?league=دوري%20أبطال%20أفريقيا",
       "الدوري السعودي": "#/leagues?league=الدوري%20السعودي", "من نحن": "#/about",
       "اتصل بنا": "#/contact", "للإعلان معنا": "#/advertise", "سياسة الخصوصية": "#/policy",
-      "المصادر الرسمية": "#/sources", "الناقلون الرسميون": "#/broadcasters"
+      "المصادر الرسمية": "#/sources", "الناقلون الرسميون": "#/broadcasters",
+      "الملخص اليومي": "#/brief", "الإعدادات والإشعارات": "#/settings"
     };
     return map[label] || "#/";
   }
@@ -245,7 +372,7 @@
       <div class="match-league"><span>${esc(m.league)}</span>${stateHTML}</div>
       <div class="match-row"><div class="team-side">${badge(h)}<span class="team-name">${esc(h.name)}</span></div>${score}</div>
       <div class="match-row"><div class="team-side away">${badge(a)}<span class="team-name">${esc(a.name)}</span></div></div>
-      <div class="match-time ${m.status === "live" ? "live-time" : ""}">${m.status === "live" ? "جارية الآن" : esc(m.time)}</div>
+      <div class="match-time ${m.status === "live" ? "live-time" : ""}">${m.status === "live" ? "جارية الآن" : esc(matchTime(m))}</div>
     </div>`;
   }
 
@@ -368,7 +495,7 @@
     } else {
       body = D.stats.upcoming.map((u) => `<div class="upcoming-row">
         <span class="tm"><span class="team-badge" style="--c1:${u.hc};--c2:#fff">${esc(u.home.charAt(0))}</span>${esc(u.home)}</span>
-        <span class="when">${esc(u.time)}</span>
+        <span class="when">${esc(cityTime(u.iso, u.time))}</span>
         <span class="tm"><span class="team-badge" style="--c1:${u.ac};--c2:#fff">${esc(u.away.charAt(0))}</span>${esc(u.away)}</span>
       </div>`).join("");
     }
@@ -523,8 +650,9 @@
   function egyDate(e) {
     const d = new Date(e.strTimestamp || e.dateEvent);
     if (isNaN(d)) return e.dateEvent || "";
-    return d.toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long" }) + " · " +
-      d.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+    const tz = getCity().tz;
+    return d.toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long", timeZone: tz }) + " · " +
+      d.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit", timeZone: tz });
   }
 
   function egyMatchCard(data, e, withScore) {
@@ -579,11 +707,195 @@
     }
   }
 
+  /* ================= صفحات الميزات الجديدة ================= */
+
+  /* --- الملخص اليومي التلقائي --- */
+  function briefFacts() {
+    const today = D.matches.today || [];
+    const yesterday = D.matches.yesterday || [];
+    const live = today.filter((m) => m.status === "live");
+    const done = today.filter((m) => m.status === "finished");
+    const goals = [];
+    [...today, ...yesterday].forEach((m) => (m.details || []).forEach((d) => {
+      if (/goal|penalty/i.test(String((d.type && d.type.text) || ""))) {
+        goals.push({ name: (d.athlete && d.athlete.displayName) || "", min: (d.clock && d.clock.displayValue) || "", team: (D.teams[String((d.team || {}).id)] || {}).code || "" });
+      }
+    }));
+    const scorer = (D.stats.scorers || [])[0];
+    const facts = [
+      "عدد مباريات اليوم: " + today.length + "، منها " + live.length + " مباشرة الآن و" + done.length + " انتهت.",
+      "الأهداف المسجلة في التغطية الحية: " + goals.length + ".",
+      goals.slice(0, 3).map((g) => (g.min ? g.min + " — " : "") + (g.name || "هدف") + (g.team ? " (" + g.team + ")" : "")).join(" · "),
+      scorer ? "هداف الدوري: " + scorer.name + " (" + scorer.goals + " هدف)." : "",
+      D.news[0] ? "الخبر الأبرز: " + D.news[0].title : ""
+    ].filter(Boolean);
+    return facts;
+  }
+
+  async function renderBriefPage() {
+    const facts = briefFacts();
+    view.innerHTML = `
+      <div class="page-head"><div class="breadcrumb"><a href="#/">الرئيسية</a> ‹ <span>الملخص اليومي</span></div>
+        <h1>الملخص اليومي 🤖</h1>
+        <p>قراءة سريعة لكل ما حدث ويحدث اليوم، مولّدة تلقائياً من البيانات الحية</p></div>
+      <section class="section"><div class="brief-card card">
+        <div class="brief-head"><span>🤖 ملخص تلقائي</span><small>${esc(new Date().toLocaleString("ar-EG"))}</small></div>
+        <ul class="brief-list">${facts.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
+        <div id="aiSummary"></div>
+        <p class="modal-note">هذا الملخص مبني على بيانات ESPN/TheSportsDB ولا يتدخل محرر في صياغته. عند ربط واجهة AI من <code>js/config.js</code> يُضاف ملخص تحليلي تلقائياً.</p>
+      </div></section>
+      <section class="section">${sectionHead("أخبار اليوم", "#/news")}<div class="news-grid">${D.news.slice(0, 4).map(newsCard).join("")}</div></section>
+      ${adSlotHTML()}`;
+    if (CFG.ai && CFG.ai.endpoint) {
+      try {
+        const r = await fetch(CFG.ai.endpoint, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: CFG.ai.model || "", input: facts.join("\n") })
+        });
+        const j = await r.json();
+        const text = j.summary || j.text || (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content);
+        const box = document.getElementById("aiSummary");
+        if (text && box) box.innerHTML = `<div class="ai-block"><b>تحليل إضافي:</b><p>${esc(text)}</p></div>`;
+      } catch (_) {}
+    }
+  }
+
+  function briefHomeHTML() {
+    const facts = briefFacts().slice(0, 3);
+    return `<div class="card brief-home">
+      <div class="brief-head"><span>🤖 ملخص اليوم</span><a href="#/brief">التفاصيل ←</a></div>
+      <ul>${facts.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
+    </div>`;
+  }
+
+  /* --- مسابقة التوقعات --- */
+  function settlePredictions() {
+    const picks = store.get("predictions", {});
+    const awarded = store.get("pred_awarded", []);
+    let gained = 0;
+    Object.keys(picks).forEach((id) => {
+      const m = findMatch(id);
+      if (!m || m.status !== "finished" || m.hs === "-" || m.as === "-" || awarded.includes(id)) return;
+      const real = Number(m.hs) > Number(m.as) ? "H" : Number(m.hs) < Number(m.as) ? "A" : "D";
+      if (picks[id] === real) { gained += 10; awarded.push(id); }
+    });
+    if (gained) { store.set("pred_awarded", awarded); store.set("points", getPoints() + gained); }
+  }
+
+  function predictionScore() {
+    const picks = store.get("predictions", {});
+    const awarded = store.get("pred_awarded", []);
+    return { pts: awarded.length * 10, picks: Object.keys(picks).length };
+  }
+
+  function renderFantasyPage() {
+    settlePredictions();
+    const picks = store.get("predictions", {});
+    const matches = (D.matches.today || []).slice(0, 6);
+    const score = predictionScore();
+    const board = store.get("fantasy_board", []);
+    const me = store.get("fantasy_name", "أنت");
+    const all = [...board.filter((b) => b.name !== me), { name: me, pts: score.pts }].sort((a, b) => b.pts - a.pts).slice(0, 6);
+    view.innerHTML = `
+      <div class="page-head"><div class="breadcrumb"><a href="#/">الرئيسية</a> ‹ <span>الفانتازي والتوقعات</span></div>
+        <h1>مسابقة التوقعات 🎯</h1>
+        <p>توقع نتيجة مباريات اليوم، اجمع النقاط، وتابع مستواك</p></div>
+      <section class="section"><div class="card fantasy-bar">
+        <div><span>نقاطك</span><b>${score.pts}</b></div>
+        <div><span>توقعاتك</span><b>${score.picks}</b></div>
+        <div><span>مستواك</span><b>${esc(levelInfo().badge + " " + levelInfo().name)}</b></div>
+        <input id="fantasyName" maxlength="20" value="${esc(me)}" placeholder="اسمك في اللوحة" aria-label="اسمك" />
+        <button data-action="fantasy-save">حفظ الاسم</button>
+      </div></section>
+      <section class="section">${sectionHead("توقع مباريات اليوم")}
+        ${matches.length ? `<div class="predict-grid">${matches.map((m) => {
+          const h = D.teams[m.home] || {}, a = D.teams[m.away] || {};
+          const pick = picks[m.id];
+          return `<div class="predict-card card">
+            <div class="predict-top"><b>${esc(h.name || m.homeRaw)}</b><span>× ${esc(matchTime(m))}</span><b>${esc(a.name || m.awayRaw)}</b></div>
+            <div class="predict-btns">
+              ${[["H", "فوز " + (h.code || "1")], ["D", "تعادل"], ["A", "فوز " + (a.code || "2")]].map(([k, label]) =>
+                `<button class="predict-btn ${pick === k ? "active" : ""}" data-action="predict" data-id="${esc(m.id)}" data-pick="${k}">${esc(label)}</button>`).join("")}
+            </div>
+            <small>${m.status === "finished" ? "النتيجة: " + esc(m.hs) + " - " + esc(m.as) : esc(m.league)}</small>
+          </div>`;
+        }).join("")}</div>` : `<div class="empty-state card"><span class="emoji">📅</span>لا توجد مباريات اليوم للتوقع عليها.</div>`}
+      </section>
+      <section class="section">${sectionHead("لوحة المتصدرين (على جهازك)")}
+        <div class="card leaderboard">${all.map((b, i) => `<div class="leader-row"><span>${i + 1}</span><b>${esc(b.name)}</b><strong>${b.pts} نقطة</strong></div>`).join("")}</div>
+        <p class="modal-note">اللوحة محلية على متصفحك فقط؛ لا يوجد خادم ألعاب. التوقع الصحيح = 10 نقاط.</p>
+      </section>`;
+  }
+
+  /* --- الإعدادات والإشعارات --- */
+  function renderSettingsPage() {
+    const city = getCity();
+    const perm = "Notification" in window ? Notification.permission : "unsupported";
+    const on = notifyOn();
+    let installBtn = "";
+    if (window.__koraInstallPrompt) installBtn = `<button class="source-link" data-action="install-app">📲 تثبيت الموقع كتطبيق</button>`;
+    view.innerHTML = `
+      <div class="page-head"><div class="breadcrumb"><a href="#/">الرئيسية</a> ‹ <span>الإعدادات</span></div>
+        <h1>الإعدادات والإشعارات 🔔</h1>
+        <p>خصّص تجربتك: توقيت المباريات، الإشعارات، وتثبيت الموقع</p></div>
+      <section class="section"><div class="settings-grid">
+        <div class="card settings-card">
+          <h3>📍 توقيت المباريات</h3>
+          <p>كل أوقات المباريات تُعرض حسب مدينتك تلقائياً.</p>
+          <select id="citySelect" data-action="city-change" aria-label="اختر مدينتك">
+            ${CITIES.map((c) => `<option value="${esc(c.key)}" ${c.key === city.key ? "selected" : ""}>${esc(c.label)} (${esc(c.tz)})</option>`).join("")}
+          </select>
+        </div>
+        <div class="card settings-card">
+          <h3>🔔 إشعارات المباريات</h3>
+          <p>حالة الإذن: <b>${esc(perm === "granted" ? "مسموح" : perm === "denied" ? "مرفوض" : "لم يُطلب بعد")}</b> · التفعيل: <b>${on ? "مفعّل" : "غير مفعّل"}</b></p>
+          <p class="modal-note">تنبيه قبل بدء مباريات فرقك المتابَعة بـ ${esc((CFG.notifications || {}).minutesBefore || 15)} دقيقة، وأثناء فتح الموقع. الإشعارات في الخلفية الكاملة تحتاج Firebase Cloud Messaging وإعداداتك الخاصة.</p>
+          <div class="source-links">
+            <button class="source-link" data-action="notify-toggle">${on ? "إيقاف الإشعارات" : "تفعيل الإشعارات"}</button>
+            <button class="source-link" data-action="notify-test">إرسال إشعار تجريبي</button>
+            ${installBtn}
+          </div>
+        </div>
+        <div class="card settings-card">
+          <h3>⚽ مستواك</h3>
+          <p>${esc(levelInfo().badge)} <b>${esc(levelInfo().name)}</b> — ${levelInfo().points} نقطة${levelInfo().next ? " · المتبقي للمستوى التالي: " + (levelInfo().next - levelInfo().points) : " · أعلى مستوى!"}</p>
+          <a class="source-link" href="#/profile">عرض ملفي الكامل ↗</a>
+        </div>
+      </div></section>`;
+  }
+
+  /* --- الملف الشخصي --- */
+  function renderProfilePage() {
+    const lv = levelInfo();
+    const favs = getFavs();
+    const comments = getComments().filter((c) => c.key.startsWith("news_") || c.key.startsWith("match_"));
+    const score = predictionScore();
+    view.innerHTML = `
+      <div class="page-head"><div class="breadcrumb"><a href="#/">الرئيسية</a> ‹ <span>ملفي</span></div>
+        <h1>ملفي ونقاطي ⚽</h1><p>ملخص تفاعلك مع yallaakora — محفوظ على جهازك</p></div>
+      <section class="section"><div class="profile-card card">
+        <div class="profile-avatar">${esc(lv.badge)}</div>
+        <div><h2>${esc(lv.name)}</h2><p>${lv.points} نقطة${lv.next ? " · " + (lv.next - lv.points) + " نقطة للمستوى التالي" : ""}</p></div>
+      </div></section>
+      <section class="section"><div class="profile-stats">
+        <div class="card"><b>${esc(favs.length)}</b><span>فرق متابَعة</span></div>
+        <div class="card"><b>${esc(comments.length)}</b><span>تعليقات</span></div>
+        <div class="card"><b>${esc(score.picks)}</b><span>توقعات</span></div>
+        <div class="card"><b>${esc(score.pts)}</b><span>نقاط توقعات</span></div>
+      </div></section>
+      <section class="section">${sectionHead(" كيف تجمع النقاط؟")}
+        <div class="card" style="padding:20px;line-height:2;color:var(--ink-2)">
+          <p>⭐ متابعة فريق: +2 · 💬 تعليق: +5 · 📊 تصويت في الاستطلاع: +5 · 🏆 اختيار رجل المباراة: +5 · 🎯 توقع صحيح: +10 · 📖 قراءة خبر: +1</p>
+          <a class="source-link" href="#/fantasy">العب مسابقة التوقعات ↗</a>
+        </div></section>`;
+  }
+
   /* ---------- views ---------- */
   function renderHome() {
     const latest = D.news.slice(0, 8);
     view.innerHTML = `
       <section class="section">${stripHTML(state.homeMatchDay, "homeStrip")}</section>
+      <div class="brief-slot">${briefHomeHTML()}</div>
       ${featuredHTML()}
       <section class="section">
         <div class="two-col">
@@ -626,7 +938,7 @@
             <div class="stats-panel">
               ${D.stats.upcoming.map((u) => `<div class="upcoming-row">
                 <span class="tm"><span class="team-badge" style="--c1:${u.hc};--c2:#fff">${esc(u.home.charAt(0))}</span>${esc(u.home)}</span>
-                <span class="when">${esc(u.time)}</span>
+                <span class="when">${esc(cityTime(u.iso, u.time))}</span>
                 <span class="tm"><span class="team-badge" style="--c1:${u.ac};--c2:#fff">${esc(u.away.charAt(0))}</span>${esc(u.away)}</span>
               </div>`).join("")}
             </div>
@@ -648,6 +960,7 @@
       <section class="section">
         ${sectionHead("كلام في الكورة", "#/news")}
         <div class="news-grid">${D.news.slice(8, 16).map(newsCard).join("")}</div>
+        ${adSlotHTML("home")}
       </section>`;
   }
 
@@ -682,6 +995,24 @@
 
   function renderArticle(id) {
     const n = D.news.find((x) => x.id === id) || D.news[0];
+    const reads = store.get("reads", {});
+    const todayKey = new Date().toDateString();
+    if (reads[n.id] !== todayKey) {
+      reads[n.id] = todayKey;
+      store.set("reads", reads);
+      store.set("points", getPoints() + 1);
+    }
+    setSEO({
+      title: n.title, desc: n.excerpt || n.body[0], image: n.image, type: "article",
+      schema: {
+        "@context": "https://schema.org", "@type": "NewsArticle",
+        "headline": n.title, "description": n.excerpt || n.body[0],
+        "image": n.image ? [n.image] : [], "datePublished": n.date || "",
+        "articleSection": n.category, "inLanguage": "ar",
+        "publisher": { "@type": "Organization", "name": "yallaakora" },
+        "mainEntityOfPage": location.href
+      }
+    });
     const related = D.news.filter((x) => x.category === n.category && x.id !== n.id).slice(0, 4);
     const share = [
       ["f", "https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(location.href)],
@@ -701,6 +1032,7 @@
           ${n.link ? `<a class="source-link" href="${esc(n.link)}" target="_blank" rel="noopener">اقرأ المقال الأصلي في المصدر ↗</a>` : ""}
           <div class="article-share"><span>مشاركة:</span>${share.map((s) => `<a href="${s[1]}" target="_blank" rel="noopener">${s[0]}</a>`).join("")}</div>
           <section class="article-comments"><h3>آراء القرّاء</h3>${commentsHTML("news_" + n.id)}</section>
+          ${adSlotHTML("article")}
         </div>
       </article>
       ${related.length ? `<section class="section related-box">${sectionHead("أخبار ذات صلة", "#/news")}<div class="news-grid">${related.map(newsCard).join("")}</div></section>` : ""}`;
@@ -952,7 +1284,7 @@
 
     const summary = `
       <div style="font-size:12px;line-height:2;color:var(--ink-2)">
-        <p>الموعد: ${esc(m.time)}</p>
+        <p>الموعد: ${esc(matchTime(m))} · ${esc(getCity().label)}</p>
         <p>الحالة: ${m.status === "live" ? "مباشر الآن" : m.status === "finished" ? "انتهت المباراة" : "لم تبدأ بعد"}</p>
         <p>البطولة: ${esc(m.league)}</p>
       </div>
@@ -1072,7 +1404,7 @@
           <span class="t-team">${badge(h)} ${esc(h.code || "")}</span>
           <b class="t-score">${esc(m.hs)} - ${esc(m.as)}</b>
           <span class="t-team">${badge(aw)} ${esc(aw.code || "")}</span>
-          <span class="t-time">${esc(m.status === "live" ? m.minute : m.time)}</span>
+          <span class="t-time">${esc(m.status === "live" ? m.minute : matchTime(m))}</span>
         </button>`;
       }).join("")}</div>
       <a class="ticker-all" href="#/matches">اللوحة الكاملة ←</a>
@@ -1080,7 +1412,7 @@
   }
 
   /* ---------- delegation ---------- */
-  document.addEventListener("click", (e) => {
+  document.addEventListener("click", async (e) => {
     const t = e.target.closest("[data-action]");
     if (!t) return;
     const a = t.dataset.action;
@@ -1126,12 +1458,17 @@
       return;
     }
     if (a === "goto-broadcasters") { closeModal(); return; }
+    if (a === "stream-fullscreen") {
+      const w = t.closest(".stream-wrap");
+      if (w && w.requestFullscreen) w.requestFullscreen().catch(() => {});
+      return;
+    }
     if (a === "follow-team") {
       const id = String(t.dataset.id);
       const favs = getFavs();
       const i = favs.indexOf(id);
       if (i >= 0) { favs.splice(i, 1); toast("تمت إزالة الفريق من متابعتي"); }
-      else { favs.push(id); toast("تمت متابعة الفريق"); }
+      else { favs.push(id); toast("تمت متابعة الفريق"); award(2, "متابعة فريق"); }
       store.set("favorites", favs);
       document.querySelectorAll('[data-action="follow-team"]').forEach((b) => {
         if (String(b.dataset.id) !== id) return;
@@ -1157,6 +1494,7 @@
       store.set("comments", all);
       box.outerHTML = commentsHTML(box.dataset.key);
       toast("تم نشر تعليقك");
+      award(5, "تعليق جديد");
       return;
     }
     if (a === "match-details") {
@@ -1174,9 +1512,40 @@
       t.parentElement.querySelectorAll("button").forEach((b) => b.classList.remove("selected"));
       t.classList.add("selected");
       toast("تم تسجيل اختيارك بنجاح");
+      award(5, "اختيار رجل المباراة");
       return;
     }
     if (a === "modal-close") { closeModal(); return; }
+    if (a === "open-settings") { location.hash = "#/settings"; return; }
+    if (a === "notify-toggle") {
+      if (!("Notification" in window)) { toast("متصفحك لا يدعم الإشعارات"); return; }
+      if (store.get("notify_on", false)) { store.set("notify_on", false); toast("تم إيقاف الإشعارات"); }
+      else {
+        const perm = await Notification.requestPermission();
+        if (perm === "granted") { store.set("notify_on", true); toast("تم تفعيل إشعارات المباريات 🔔"); pushNotify("yallaakora", "تم تفعيل الإشعارات بنجاح ⚽"); }
+        else toast("لم يتم منح إذن الإشعارات");
+      }
+      renderSettingsPage();
+      return;
+    }
+    if (a === "notify-test") { pushNotify("yallaakora ⚽", "إشعار تجريبي — الإشعارات تعمل بشكل صحيح!"); toast("تم إرسال الإشعار التجريبي"); return; }
+    if (a === "install-app") {
+      const p = window.__koraInstallPrompt;
+      if (p) { p.prompt(); await p.userChoice; window.__koraInstallPrompt = null; renderSettingsPage(); }
+      return;
+    }
+    if (a === "predict") {
+      const picks = store.get("predictions", {});
+      picks[t.dataset.id] = t.dataset.pick;
+      store.set("predictions", picks);
+      renderFantasyPage();
+      return;
+    }
+    if (a === "fantasy-save") {
+      const input = document.getElementById("fantasyName");
+      if (input && input.value.trim()) { store.set("fantasy_name", input.value.trim().slice(0, 20)); toast("تم حفظ اسمك في اللوحة"); renderFantasyPage(); }
+      return;
+    }
     if (a === "refresh-live") { refreshLive(true); return; }
 
     if (a === "strip-tab") {
@@ -1203,6 +1572,7 @@
       const card = document.getElementById("pollCard");
       if (card) card.outerHTML = pollHTML();
       toast("تم تسجيل تصويتك، شكراً لك!");
+      award(5, "تصويت في الاستطلاع");
       return;
     }
     if (a === "stats-tab") {
@@ -1222,6 +1592,19 @@
     if (a === "load-more") { state.newsShown += 8; renderNewsPage(new URLSearchParams(location.hash.split("?")[1] || "")); return; }
   });
 
+  document.addEventListener("change", (e) => {
+    if (e.target && e.target.id === "citySelect") {
+      store.set("city", e.target.value);
+      const c = getCity();
+      const pill = document.getElementById("cityPill");
+      if (pill) pill.textContent = "📍 " + c.label;
+      toast("التوقيت الآن حسب مدينة " + c.label);
+      route();
+    } else if (e.target && e.target.classList && e.target.classList.contains("hls-quality")) {
+      if (window.__koraHls) window.__koraHls.currentLevel = Number(e.target.value);
+    }
+  });
+
   /* ---------- router ---------- */
   function route() {
     const raw = location.hash.replace(/^#\/?/, "");
@@ -1234,8 +1617,24 @@
       a.classList.toggle("active", parts[0] === seg || (parts[0] === "news" && seg === "news"));
     });
 
-    renderLeagueTabs();
     const key = parts[0] || "home";
+    const SEO_PAGES = {
+      home: ["", "أخبار ومباريات ونتائج كرة القدم — تغطية حية ودقيقة بدقيقة لكل البطولات."],
+      matches: ["مركز المباريات", "نتائج ومواعيد كل المباريات في مختلف الدوريات مع تحديث حي."],
+      news: ["الأخبار الرياضية", "آخر أخبار كرة القدم والانتقالات والتحليلات."],
+      egypt: ["الدوري المصري الممتاز", "مواعيد ونتائج الدوري المصري الممتاز وجولاته."],
+      brief: ["الملخص اليومي", "ملخص تلقائي لأحداث اليوم من البيانات الحية."],
+      fantasy: ["مسابقة التوقعات", "توقع نتائج المباريات واجمع النقاط."],
+      sources: ["المصادر الرسمية", "مصادر الفيديو والبيانات المرخّصة والموثّقة."],
+      broadcasters: ["الناقلون الرسميون", "دليل حقوق بث البطولات في الشرق الأوسط وشمال أفريقيا."],
+      settings: ["الإعدادات والإشعارات", "اضبط توقيت المباريات والإشعارات حسب مدينتك."],
+      profile: ["ملفي ونقاطي", "مستواك ونقاطك وتفاعلك مع yallaakora."]
+    };
+    const seo = SEO_PAGES[key] || [];
+    setSEO({ title: seo[0] || "", desc: seo[1] });
+    initAds();
+
+    renderLeagueTabs();
     if (key === "home") { renderHome(); fillEgyptHome(); }
     else if (key === "news") parts[1] ? renderArticle(parts[1]) : renderNewsPage(query);
     else if (key === "matches") renderMatchesPage();
@@ -1244,6 +1643,10 @@
     else if (key === "sources") renderSourcesPage();
     else if (key === "broadcasters") renderBroadcastersPage();
     else if (key === "egypt") renderEgyptPage();
+    else if (key === "brief") renderBriefPage();
+    else if (key === "fantasy") renderFantasyPage();
+    else if (key === "settings") renderSettingsPage();
+    else if (key === "profile") renderProfilePage();
     else renderSimplePage(key);
 
     if (location.hash !== "#/") window.scrollTo({ top: 0, behavior: "auto" });
@@ -1263,6 +1666,8 @@
       renderLeagueTabs();
       renderScoreTicker();
       route();
+      checkKickoffs();
+      settlePredictions();
       status.classList.remove("error");
       status.textContent = "بيانات حية · " + new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
       if (showToast) toast("تم تحديث البيانات من المصدر الحي");
@@ -1290,4 +1695,14 @@
   route();
   refreshLive(true);
   setInterval(() => { if (!document.hidden) refreshLive(false); }, 5 * 60 * 1000);
+
+  /* تثبيت الموقع كتطبيق (PWA) + العمل دون اتصال */
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => { navigator.serviceWorker.register("./sw.js").catch(() => {}); });
+  }
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    window.__koraInstallPrompt = e;
+    if ((location.hash || "").includes("settings")) renderSettingsPage();
+  });
 })();

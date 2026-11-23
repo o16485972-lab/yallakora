@@ -132,6 +132,7 @@
           hs: homeC.score != null ? homeC.score : "-",
           as: awayC.score != null ? awayC.score : "-",
           time: timeOf(ev.date),
+          iso: ev.date || "",
           status: st,
           minute: st === "live" ? ((ev.status && (ev.status.displayClock || (ev.status.type && ev.status.type.shortDetail))) || "الآن") : "",
           leagueKey: r.league.key,
@@ -295,6 +296,7 @@
       home: live.home, away: live.away,
       hs: live.hs, as: live.as,
       minute: live.minute || "الآن",
+      iso: live.iso || "",
       rawEvents: events,
       rawNames: events.map((e) => e.text)
     };
@@ -354,6 +356,7 @@
       home: built.teams[m.home] ? built.teams[m.home].name : "فريق",
       away: built.teams[m.away] ? built.teams[m.away].name : "فريق",
       time: m.time + " " + (m.dateLabel || ""),
+      iso: m.iso || "",
       hc: built.teams[m.home] ? built.teams[m.home].c1 : "#334155",
       ac: built.teams[m.away] ? built.teams[m.away].c1 : "#334155"
     }));
@@ -381,6 +384,7 @@
         hs: liveData.hs,
         as: liveData.as,
         minute: liveData.minute,
+        iso: liveData.iso,
         events: liveData.events
       } : base.live,
       nav: base.nav,

@@ -5,11 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0f172a" />
   <meta name="description" content="yallaakora - أخبار كرة القدم، المباريات، النتائج المباشرة، الترتيب والهدافون وكل ما يهم عشاق الساحرة المستديرة." />
+  <meta name="keywords" content="يلا كورة, كرة القدم, نتائج مباشرة, مباريات اليوم, الدوري المصري, أخبار رياضية, yallaakora" />
+  <meta name="robots" content="index,follow" />
+  <meta name="author" content="yallaakora" />
+  <meta property="og:site_name" content="yallaakora" />
+  <meta property="og:locale" content="ar_AR" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="yallaakora | أخبار ومباريات ونتائج كرة القدم" />
+  <meta property="og:description" content="نتائج حية وأخبار وتغطية دقيقة بدقيقة لكل البطولات العربية والعالمية." />
+  <meta property="og:image" content="https://yallakora.mooo.com/icon.svg" />
+  <meta property="og:url" content="https://yallakora.mooo.com/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="yallaakora | أخبار ومباريات ونتائج كرة القدم" />
+  <meta name="twitter:description" content="نتائج حية وأخبار وتغطية دقيقة بدقيقة لكل البطولات العربية والعالمية." />
+  <link rel="canonical" href="https://yallakora.mooo.com/" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"WebSite","name":"yallaakora","url":"https://yallakora.mooo.com/","inLanguage":"ar","description":"منصة رياضية عربية للأخبار والنتائج والمباريات المباشرة","publisher":{"@type":"Organization","name":"yallaakora","url":"https://yallakora.mooo.com/"}}
+  </script>
   <title>yallaakora | أخبار ومباريات ونتائج كرة القدم</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/styles.css?v=12" />
+  <link rel="stylesheet" href="css/styles.css?v=13" />
 </head>
 <body>
   <!-- ============ HEADER ============ -->
@@ -42,6 +64,8 @@
           <button class="icon-btn search-btn" id="searchBtn" aria-label="بحث">
             <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
           </button>
+          <button class="icon-btn" id="notifyBtn" data-action="open-settings" aria-label="الإشعارات والإعدادات" title="الإشعارات والإعدادات">🔔</button>
+          <a href="#/settings" class="city-pill" id="cityPill" title="توقيت المباريات حسب مدينتك">📍 القاهرة</a>
           <a href="#/matches" class="live-pill"><span class="live-dot"></span> مباشر</a>
         </div>
       </div>
@@ -107,6 +131,8 @@
           <a href="#/policy">سياسة الخصوصية</a>
           <a href="#/sources">المصادر الرسمية</a>
           <a href="#/broadcasters">الناقلون الرسميون</a>
+          <a href="#/settings">الإعدادات والإشعارات</a>
+          <a href="#/profile">ملفي ونقاطي</a>
         </div>
       </div>
     </div>
@@ -127,11 +153,12 @@
   <div class="modal-root" id="modalRoot" aria-hidden="true"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <script src="js/config.js"></script>
   <script src="js/data.js?v=2"></script>
   <script src="js/streams.js"></script>
   <script src="js/sources.js?v=2"></script>
-  <script src="js/live.js?v=2"></script>
+  <script src="js/live.js?v=3"></script>
   <script src="js/enrich.js?v=6"></script>
-  <script src="js/app.js?v=20"></script>
+  <script src="js/app.js?v=21"></script>
 </body>
 </html>

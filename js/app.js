@@ -125,7 +125,7 @@
       const id = slot || a.adsenseSlot;
       return `<div class="ad-slot"><small>إعلان</small><ins class="adsbygoogle" style="display:block" data-ad-client="${esc(a.adsenseClient)}" data-ad-slot="${esc(id)}" data-ad-format="auto" data-full-width-responsive="true"></ins></div>`;
     }
-    const sponsors = a.sponsors || [];
+    const sponsors = [...(a.sponsors || []), ...(store.get("sponsors", []) || [])];
     if (sponsors.length) {
       return `<div class="sponsor-strip"><span>شركاء yallaakora</span>${sponsors.map((s) => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${s.logo ? `<img src="${esc(s.logo)}" alt="${esc(s.name)}">` : esc(s.name)}</a>`).join("")}</div>`;
     }
@@ -317,7 +317,7 @@
       "الدوري السعودي": "#/leagues?league=الدوري%20السعودي", "من نحن": "#/about",
       "اتصل بنا": "#/contact", "للإعلان معنا": "#/advertise", "سياسة الخصوصية": "#/policy",
       "المصادر الرسمية": "#/sources", "الناقلون الرسميون": "#/broadcasters",
-      "الملخص اليومي": "#/brief", "الإعدادات والإشعارات": "#/settings"
+      "الملخص اليومي": "#/brief", "الإعدادات والإشعارات": "#/settings", "لوحة التحكم": "#/admin"
     };
     return map[label] || "#/";
   }
@@ -888,6 +888,60 @@
           <p>⭐ متابعة فريق: +2 · 💬 تعليق: +5 · 📊 تصويت في الاستطلاع: +5 · 🏆 اختيار رجل المباراة: +5 · 🎯 توقع صحيح: +10 · 📖 قراءة خبر: +1</p>
           <a class="source-link" href="#/fantasy">العب مسابقة التوقعات ↗</a>
         </div></section>`;
+  }
+
+  /* --- لوحة تحكم خفيفة (محلية بالكامل) --- */
+  function renderAdminPage() {
+    const a = CFG.ads || {};
+    const sponsors = store.get("sponsors", []) || [];
+    const keys = Object.keys(localStorage).filter((k) => k.indexOf("kora_") === 0).sort();
+    const status = (ok) => ok ? `<span class="pill-ok">مفعّل</span>` : `<span class="pill-off">غير مفعّل</span>`;
+    const cfg = [
+      ["بيانات حية (ESPN)", status(!!D.liveMode)],
+      ["إشعارات المتصفح", status(notifyOn())],
+      ["Firebase / FCM", status(!!((CFG.firebase || {}).apiKey))],
+      ["واجهة AI", status(!!((CFG.ai || {}).endpoint))],
+      ["AdSense", status(!!(a.enabled && a.adsenseClient))],
+      ["PWA / Service Worker", status("serviceWorker" in navigator)]
+    ];
+    view.innerHTML = `
+      <div class="page-head"><div class="breadcrumb"><a href="#/">الرئيسية</a> ‹ <span>لوحة التحكم</span></div>
+        <h1>لوحة التحكم ⚙️</h1><p>نظرة سريعة على حالة الموقع والإعدادات — كل شيء محفوظ على جهازك فقط</p></div>
+      <section class="section"><div class="admin-grid">
+        <div class="card admin-card"><h3>حالة المصادر والميزات</h3>
+          <div class="admin-rows">${cfg.map(([k, v]) => `<div><span>${esc(k)}</span>${v}</div>`).join("")}</div>
+        </div>
+        <div class="card admin-card"><h3>إحصائيات المحتوى</h3>
+          <div class="admin-rows">
+            <div><span>مباريات اليوم</span><b>${(D.matches.today || []).length}</b></div>
+            <div><span>الأخبار</span><b>${D.news.length}</b></div>
+            <div><span>الدوريات</span><b>${Object.keys(D.leagues || {}).length}</b></div>
+            <div><span>مفاتيح التخزين المحلي</span><b>${keys.length}</b></div>
+            <div><span>الرعاة المحليون</span><b>${sponsors.length}</b></div>
+          </div>
+        </div>
+      </div></section>
+      <section class="section"><div class="card admin-card">
+        <h3>🗂️ البيانات المحفوظة على الجهاز</h3>
+        ${keys.length ? `<div class="cache-list">${keys.map((k) => `<div><code>${esc(k)}</code><small>${(localStorage.getItem(k) || "").length} حرف</small><button data-action="cache-clear" data-key="${esc(k)}">حذف</button></div>`).join("")}</div>`
+          : `<p class="modal-note">لا توجد بيانات محفوظة بعد.</p>`}
+        <div class="source-links" style="margin-top:12px">
+          <button class="source-link" data-action="cache-clear-all">مسح كل الكاش المحلي</button>
+          <button class="source-link" data-action="admin-export">تصدير الإعدادات JSON</button>
+        </div>
+      </div></section>
+      <section class="section"><div class="card admin-card">
+        <h3>🤝 شركاء الموقع (يظهرون في مساحات الإعلان)</h3>
+        <p class="modal-note">أضف راعياً من رابطه الرسمي فقط. تظهر هذه القائمة على جهازك، ويمكنك إعدادها مركزياً في <code>js/config.js</code> تحت <code>ads.sponsors</code>.</p>
+        <div class="admin-form">
+          <input id="sponsorName" placeholder="اسم الشريك" maxlength="40" />
+          <input id="sponsorUrl" placeholder="https://..." dir="ltr" />
+          <input id="sponsorLogo" placeholder="رابط الشعار (اختياري)" dir="ltr" />
+          <button data-action="sponsor-add">إضافة</button>
+        </div>
+        ${sponsors.length ? `<div class="cache-list" style="margin-top:12px">${sponsors.map((s, i) => `<div><b>${esc(s.name)}</b><small>${esc(s.url)}</small><button data-action="sponsor-remove" data-index="${i}">حذف</button></div>`).join("")}</div>` : ""}
+      </div></section>
+      <p class="modal-note">هذه لوحة عرض وإدارة محلية، وليست لوحة تحكم خادم. النشر المركزي وتحليلات الزوار تحتاج استضافة TypeScript/backend أو خدمة تحليلات خارجية.</p>`;
   }
 
   /* ---------- views ---------- */
@@ -1546,6 +1600,48 @@
       if (input && input.value.trim()) { store.set("fantasy_name", input.value.trim().slice(0, 20)); toast("تم حفظ اسمك في اللوحة"); renderFantasyPage(); }
       return;
     }
+    if (a === "cache-clear" || a === "cache-clear-all") {
+      if (a === "cache-clear-all") {
+        Object.keys(localStorage).filter((k) => k.indexOf("kora_") === 0).forEach((k) => localStorage.removeItem(k));
+        toast("تم مسح البيانات المحلية");
+      } else {
+        localStorage.removeItem("kora_" + t.dataset.key);
+        toast("تم حذف المفتاح");
+      }
+      renderAdminPage();
+      return;
+    }
+    if (a === "sponsor-add") {
+      const name = document.getElementById("sponsorName")?.value.trim();
+      const url = document.getElementById("sponsorUrl")?.value.trim();
+      const logo = document.getElementById("sponsorLogo")?.value.trim() || "";
+      if (!name || !/^https?:\/\//i.test(url)) { toast("أدخل الاسم ورابطاً صحيحاً يبدأ بـ https"); return; }
+      const list = store.get("sponsors", []) || [];
+      list.push({ name: name.slice(0, 40), url, logo });
+      store.set("sponsors", list);
+      toast("تمت إضافة الشريك");
+      renderAdminPage();
+      return;
+    }
+    if (a === "sponsor-remove") {
+      const list = store.get("sponsors", []) || [];
+      list.splice(Number(t.dataset.index), 1);
+      store.set("sponsors", list);
+      renderAdminPage();
+      return;
+    }
+    if (a === "admin-export") {
+      const data = {};
+      Object.keys(localStorage).filter((k) => k.indexOf("kora_") === 0).forEach((k) => { data[k] = localStorage.getItem(k); });
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "yallaakora-settings.json";
+      link.click();
+      URL.revokeObjectURL(link.href);
+      toast("تم تصدير الإعدادات");
+      return;
+    }
     if (a === "refresh-live") { refreshLive(true); return; }
 
     if (a === "strip-tab") {
@@ -1628,7 +1724,8 @@
       sources: ["المصادر الرسمية", "مصادر الفيديو والبيانات المرخّصة والموثّقة."],
       broadcasters: ["الناقلون الرسميون", "دليل حقوق بث البطولات في الشرق الأوسط وشمال أفريقيا."],
       settings: ["الإعدادات والإشعارات", "اضبط توقيت المباريات والإشعارات حسب مدينتك."],
-      profile: ["ملفي ونقاطي", "مستواك ونقاطك وتفاعلك مع yallaakora."]
+      profile: ["ملفي ونقاطي", "مستواك ونقاطك وتفاعلك مع yallaakora."],
+      admin: ["لوحة التحكم", "حالة المصادر والإعدادات المحلية لـ yallaakora."]
     };
     const seo = SEO_PAGES[key] || [];
     setSEO({ title: seo[0] || "", desc: seo[1] });
@@ -1647,6 +1744,7 @@
     else if (key === "fantasy") renderFantasyPage();
     else if (key === "settings") renderSettingsPage();
     else if (key === "profile") renderProfilePage();
+    else if (key === "admin") renderAdminPage();
     else renderSimplePage(key);
 
     if (location.hash !== "#/") window.scrollTo({ top: 0, behavior: "auto" });

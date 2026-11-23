@@ -1,0 +1,5 @@
+# yallaakora ads.txt
+# هذا ملف قالب فارغ — لا تضيف معرّف ناشر ليس لك.
+# بعد الموافقة على AdSense استبدل السطر التالي بمعرّفك الخاص:
+# google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0
+# ثم انشر الملف في جذر النطاق: https://yallakora.mooo.com/ads.txt

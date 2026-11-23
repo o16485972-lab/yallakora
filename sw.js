@@ -1,10 +1,10 @@
 /* yallaakora - Service Worker: تثبيت كتطبيق + عمل دون اتصال + إشعارات */
-const CACHE = "kora-v21";
+const CACHE = "kora-v22";
 const SHELL = [
   "./", "./index.html", "./manifest.json", "./icon.svg",
-  "./css/styles.css?v=13", "./js/config.js", "./js/data.js?v=2",
+  "./css/styles.css?v=14", "./js/config.js", "./js/data.js?v=3",
   "./js/streams.js", "./js/sources.js?v=2", "./js/live.js?v=3",
-  "./js/enrich.js?v=6", "./js/app.js?v=21"
+  "./js/enrich.js?v=6", "./js/app.js?v=22"
 ];
 
 self.addEventListener("install", (e) => {

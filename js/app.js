@@ -697,7 +697,8 @@
       if (!rows.length) throw new Error("empty");
       store.set(key, rows);
       box.innerHTML = lineupHTML(m, rows);
-    } catch (_) {
+    } catch (err) {
+      console.warn("Lineup unavailable:", m.homeRaw, m.awayRaw, err);
       box.innerHTML = `<p class="modal-note">التشكيلات غير متوفرة لهذه المباراة في مصدر البيانات حالياً.</p>`;
     }
   }

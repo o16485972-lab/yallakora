@@ -86,6 +86,8 @@
     const f = CFG.firebase || {};
     return !!(f.apiKey && f.messagingSenderId && f.appId && f.vapidKey);
   };
+  const getFunctionsUrl = () => store.get("functions_url", CFG.functionsUrl || "");
+  const getAiEndpoint = () => store.get("ai_endpoint", (CFG.ai || {}).endpoint || "");
   const fcmStatusText = () => ({
     off: "غير مُعدّ", ready: "جاهز ✔", denied: "إذن مرفوض", error: "تعذّر الاتصال", loading: "جارٍ التهيئة..."
   })[fcmState] || fcmState;
@@ -115,6 +117,13 @@
       fcmToken = await messaging.getToken({ vapidKey: f.vapidKey });
       store.set("fcm_token", fcmToken);
       fcmState = "ready";
+      const fn = getFunctionsUrl();
+      if (fn) {
+        fetch(fn.replace(/\/$/, "") + "/registerToken", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: fcmToken, city: getCity().key, favorites: getFavs() })
+        }).catch(() => {});
+      }
       messaging.onMessage((p) => {
         const n = p.notification || {};
         pushNotify(n.title || "yallaakora ⚽", n.body || "");
@@ -155,8 +164,16 @@
 
   /* --- مساحات إعلانية/رعاة (تُفعّل من config.js فقط) --- */
   let adsStarted = false;
-  function initAds() {
+  function adCfg() {
     const a = CFG.ads || {};
+    return {
+      enabled: store.get("ads_enabled", a.enabled || false),
+      adsenseClient: store.get("ads_client", a.adsenseClient || ""),
+      adsenseSlot: store.get("ads_slot", a.adsenseSlot || "")
+    };
+  }
+  function initAds() {
+    const a = adCfg();
     if (adsStarted || !a.enabled || !a.adsenseClient) return;
     adsStarted = true;
     const s = document.createElement("script");
@@ -167,7 +184,7 @@
     document.head.appendChild(s);
   }
   function adSlotHTML(slot) {
-    const a = CFG.ads || {};
+    const a = adCfg();
     if (a.enabled && a.adsenseClient && a.adsenseSlot) {
       const id = slot || a.adsenseSlot;
       return `<div class="ad-slot"><small>إعلان</small><ins class="adsbygoogle" style="display:block" data-ad-client="${esc(a.adsenseClient)}" data-ad-slot="${esc(id)}" data-ad-format="auto" data-full-width-responsive="true"></ins></div>`;
@@ -793,11 +810,12 @@
       </div></section>
       <section class="section">${sectionHead("أخبار اليوم", "#/news")}<div class="news-grid">${D.news.slice(0, 4).map(newsCard).join("")}</div></section>
       ${adSlotHTML()}`;
-    if (CFG.ai && CFG.ai.endpoint) {
+    const aiEndpoint = getAiEndpoint();
+    if (aiEndpoint) {
       try {
-        const r = await fetch(CFG.ai.endpoint, {
+        const r = await fetch(aiEndpoint, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: CFG.ai.model || "", input: facts.join("\n") })
+          body: JSON.stringify({ model: (CFG.ai || {}).model || "", input: facts.join("\n") })
         });
         const j = await r.json();
         const text = j.summary || j.text || (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content);
@@ -979,6 +997,18 @@
           <button class="source-link" data-action="cache-clear-all">مسح كل الكاش المحلي</button>
           <button class="source-link" data-action="admin-export">تصدير الإعدادات JSON</button>
         </div>
+      </div></section>
+      <section class="section"><div class="card admin-card">
+        <h3>🔌 الربط بالـ Backend والإعلانات</h3>
+        <p class="modal-note">تُحفظ هذه الروابط على جهازك فقط. <b>لا تكتب مفاتيح سرية هنا</b> — الروابط ومعرّف المعلن بيانات عامة.</p>
+        <div class="admin-form admin-form-2">
+          <input id="cfgFunctionsUrl" dir="ltr" placeholder="https://europe-west1-PROJECT.cloudfunctions.net" value="${esc(getFunctionsUrl())}" />
+          <input id="cfgAiEndpoint" dir="ltr" placeholder="https://.../aiBrief" value="${esc(getAiEndpoint())}" />
+          <input id="cfgAdsClient" dir="ltr" placeholder="ca-pub-XXXXXXXXXXXXXXXX" value="${esc(adCfg().adsenseClient)}" />
+          <input id="cfgAdsSlot" dir="ltr" placeholder="معرف مساحة الإعلان" value="${esc(adCfg().adsenseSlot)}" />
+        </div>
+        <label class="admin-check"><input type="checkbox" id="cfgAdsEnabled" ${adCfg().enabled ? "checked" : ""} /> تفعيل مساحات AdSense</label>
+        <div class="source-links" style="margin-top:10px"><button class="source-link" data-action="admin-save-config">حفظ الإعدادات وإعادة التحميل</button></div>
       </div></section>
       <section class="section"><div class="card admin-card">
         <h3>🤝 شركاء الموقع (يظهرون في مساحات الإعلان)</h3>
@@ -1683,6 +1713,17 @@
       list.splice(Number(t.dataset.index), 1);
       store.set("sponsors", list);
       renderAdminPage();
+      return;
+    }
+    if (a === "admin-save-config") {
+      store.set("functions_url", (document.getElementById("cfgFunctionsUrl")?.value || "").trim());
+      store.set("ai_endpoint", (document.getElementById("cfgAiEndpoint")?.value || "").trim());
+      store.set("ads_client", (document.getElementById("cfgAdsClient")?.value || "").trim());
+      store.set("ads_slot", (document.getElementById("cfgAdsSlot")?.value || "").trim());
+      store.set("ads_enabled", !!(document.getElementById("cfgAdsEnabled")?.checked));
+      toast("تم حفظ الإعدادات");
+      const ver = new URLSearchParams(location.search).get("v");
+      location.href = location.pathname + (ver ? "?v=" + encodeURIComponent(ver) : "") + location.hash;
       return;
     }
     if (a === "admin-export") {

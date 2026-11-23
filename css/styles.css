@@ -747,4 +747,7 @@ html[dir="ltr"] .more-link::before { content: "→"; }
 .admin-form { display: flex; gap: 8px; flex-wrap: wrap; }
 .admin-form input { flex: 1; min-width: 140px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); font-size: 12px; }
 .admin-form button { padding: 9px 16px; border: 0; border-radius: 9px; background: var(--primary); color: #fff; font-size: 12px; font-weight: 800; cursor: pointer; }
+.admin-form-2 input { min-width: 220px; }
+.admin-check { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; font-weight: 700; color: var(--ink-2); cursor: pointer; }
+.admin-check input { accent-color: var(--primary); }
 @media (max-width: 800px) { .admin-grid { grid-template-columns: 1fr; } }

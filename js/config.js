@@ -35,6 +35,9 @@
        4) الصق القيم هنا. يتولّى الموقع تسجيل الـ Service Worker وطلب الإذن وجلب رمز الجهاز تلقائياً.
        ملاحظة: إرسال الإشعارات فعلياً يحتاج خادم/دالة سحابية ترسل عبر FCM باستخدام رمز الخادم (Server Key). */
     firebase: { apiKey: "", messagingSenderId: "", appId: "", vapidKey: "" },
+    /* رابط Cloud Functions بعد نشر مجلد functions/ — مثال:
+       https://europe-west1-MY_PROJECT.cloudfunctions.net */
+    functionsUrl: "",
 
     /* الإعلانات والرعاة — كلها معطّلة افتراضياً حتى تُضيف بياناتك */
     ads: {

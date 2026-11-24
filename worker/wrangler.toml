@@ -6,7 +6,7 @@ compatibility_date = "2026-01-01"
 # ثم ضع الـ ID هنا (أو استخدم wrangler kv namespace create KORA_KV)
 [[kv_namespaces]]
 binding = "KORA_KV"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "38ec78f654f442ff8226eb718db609d8"
 
 # تنبيه بدء المباريات كل 5 دقائق (مجاني في خطة Workers)
 [triggers]

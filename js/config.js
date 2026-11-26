@@ -12,6 +12,14 @@
     /* الرابط الرسمي للموقع — يُستخدم في canonical و Open Graph */
     siteUrl: "https://yallakora.mooo.com",
 
+    /* تقديم تطبيق Next.js داخل نفس النطاق عبر Service Worker (بدون تغيير الدومين) */
+    nextProxy: {
+      enabled: true,
+      origin: "https://yallaakora.pages.dev",
+      /* أضف ?static=1 لأي صفحة للعودة إلى النسخة الثابتة القديمة */
+      bypassParam: "static"
+    },
+
     /* المدن والمناطق الزمنية لتحويل توقيت المباريات تلقائياً */
     cities: [
       { key: "cairo", label: "القاهرة", tz: "Africa/Cairo" },

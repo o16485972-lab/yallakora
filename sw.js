@@ -21,13 +21,50 @@ if (FCM_SENDER) {
 /* Cloudflare Worker للإشعارات في الخلفية — يُمرَّر في رابط التسجيل */
 const WORKER_URL = FCM_Q.get("worker") || "";
 
-const CACHE = "kora-v26";
+/* تطبيق Next.js يُقدَّم داخل نفس النطاق عبر هذا الـ Service Worker */
+const NEXT_ORIGIN = "https://yallaakora.pages.dev";
+const BYPASS_PARAM = "static";
+const STATIC_PATHS = ["/sw.js", "/manifest.json", "/icon.svg", "/ads.txt", "/robots.txt", "/sitemap.xml"];
+const STATIC_PREFIXES = ["/css/", "/js/"];
+
+const CACHE = "kora-v28";
 const SHELL = [
   "./", "./index.html", "./manifest.json", "./icon.svg",
-  "./css/styles.css?v=15", "./js/config.js?v=3", "./js/data.js?v=3",
+  "./css/styles.css?v=15", "./js/config.js?v=5", "./js/data.js?v=3",
   "./js/streams.js", "./js/sources.js?v=2", "./js/live.js?v=3",
-  "./js/enrich.js?v=6", "./js/app.js?v=26"
+  "./js/enrich.js?v=6", "./js/app.js?v=28"
 ];
+
+function shouldProxy(url) {
+  if (url.origin !== self.location.origin) return false;
+  if (url.searchParams.has(BYPASS_PARAM)) return false;
+  if (STATIC_PATHS.includes(url.pathname)) return false;
+  if (STATIC_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) return false;
+  return true;
+}
+
+async function proxyNext(request) {
+  if (!["GET", "HEAD"].includes(request.method)) {
+    return new Response("Method Not Allowed", { status: 405, headers: { allow: "GET, HEAD" } });
+  }
+  const target = new URL(NEXT_ORIGIN + request.url.slice(self.location.origin.length));
+  const headers = new Headers(request.headers);
+  headers.delete("host");
+  try {
+    const res = await fetch(new Request(target.toString(), {
+      method: request.method,
+      headers,
+      redirect: "manual",
+      cache: "no-store"
+    }));
+    return new Response(res.body, res);
+  } catch (err) {
+    return new Response("تعذّر تحميل النسخة الجديدة، جرّب تحديث الصفحة.", {
+      status: 502,
+      headers: { "content-type": "text/plain; charset=utf-8" }
+    });
+  }
+}
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE)
@@ -44,8 +81,15 @@ self.addEventListener("activate", (e) => {
 });
 
 self.addEventListener("fetch", (e) => {
-  if (e.request.method !== "GET") return;
+  if (e.request.method !== "GET" && e.request.method !== "HEAD") return;
   const url = new URL(e.request.url);
+
+  /* نسخة Next داخل نفس الدومين — كل المسارات عدا ملفات الموقع الثابت */
+  if (shouldProxy(url)) {
+    e.respondWith(proxyNext(e.request));
+    return;
+  }
+
   if (url.origin !== self.location.origin) return; // لا نخزن بيانات ESPN/يوتيوب
 
   if (e.request.mode === "navigate") {
@@ -88,16 +132,22 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
-  let target = "./";
+  let target = "/";
+  const routeMap = { "#/": "/", "#/matches": "/matches", "#/news": "/news", "#/sources": "/sources" };
   try {
     const raw = e.notification.data && e.notification.data.url;
-    if (raw) { const u = new URL(raw, self.location.origin); if (u.origin === self.location.origin) target = u.pathname + u.search + u.hash; }
+    if (raw) {
+      const u = new URL(raw, self.location.origin);
+      if (u.origin === self.location.origin) {
+        target = routeMap[u.hash] || (u.pathname === "/" ? "/" : u.pathname + u.search + u.hash);
+      }
+    }
   } catch (_) {}
   e.waitUntil(
     self.clients.matchAll({ type: "window" }).then((clients) => {
       if (!clients.length) return self.clients.openWindow(target);
       const c = clients[0];
-      return (target !== "./" ? c.navigate(target) : Promise.resolve()).then(() => c.focus());
+      return (target !== "/" ? c.navigate(target) : Promise.resolve()).then(() => c.focus());
     })
   );
 });

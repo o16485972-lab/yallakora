@@ -1,20 +1,14 @@
 {
-  "appBrowserRuntime": "_next/static/chunks/D06Gtip8.js",
-  "appBrowserEntry": "_next/static/chunks/D06Gtip8.js",
-  "appRouteManifest": "_next/static/chunks/CWxmXLfm.js",
+  "appBrowserRuntime": "_next/static/chunks/D1QR0Nen.js",
+  "appBrowserEntry": "_next/static/chunks/D1QR0Nen.js",
+  "appRouteManifest": "_next/static/chunks/DtRqgpQB.js",
   "appClientReferenceChunks": {
     "references": {
-      "ca2778756415": 0,
-      "5c9d4c4e5d95": 1,
-      "15c18cfaeeff": 2,
-      "94e719218523": 3
+      "5c9d4c4e5d95": 0,
+      "15c18cfaeeff": 1,
+      "94e719218523": 2
     },
     "modules": [
-      {
-        "file": "_next/static/chunks/CADTuMhZ.js",
-        "imports": [],
-        "css": []
-      },
       {
         "file": "_next/static/chunks/CLWZsZ0S.js",
         "imports": [],

@@ -21,6 +21,17 @@
     { key: "uefa.champions", ar: "دوري أبطال أوروبا", icon: "⭐" }
   ];
 
+  /* لوحة الترتيب والهدافين لعدة دوريات — زي مواقع النتائج العالمية */
+  const STATS_LEAGUES = [
+    { key: "eng.1", label: "الإنجليزي" },
+    { key: "esp.1", label: "الإسباني" },
+    { key: "ita.1", label: "الإيطالي" },
+    { key: "ger.1", label: "الألماني" },
+    { key: "ksa.1", label: "السعودي" },
+    { key: "egy", label: "المصري" }
+  ];
+  const statsCache = new Map();
+
   async function fetchJSON(url) {
     const res = await fetch(url, { headers: { Accept: "application/json" } });
     if (!res.ok) throw new Error("HTTP " + res.status + " - " + url);
@@ -312,9 +323,6 @@
     otherLeagues.forEach((l) => calls.push({ day: "yesterday", league: l, url: SITE + l.key + "/scoreboard?dates=" + dateKey(-1) }));
     otherLeagues.forEach((l) => calls.push({ day: "tomorrow", league: l, url: SITE + l.key + "/scoreboard?dates=" + dateKey(1) }));
     LEAGUES.slice(0, 5).forEach((l) => calls.push({ day: "news", league: l, url: SITE + l.key + "/news?limit=12" }));
-    calls.push({ day: "standings", url: WEB + "eng.1/standings?region=us&lang=en&contentorigin=espn" });
-    calls.push({ day: "leaders", url: CORE + "leagues/eng.1/seasons/" + new Date().getFullYear() + "/types/1/leaders?lang=en&region=us" });
-
     const responses = await Promise.allSettled(calls.map((c) => fetchJSON(c.url)));
     const results = calls.map((c, i) => ({ ...c, json: responses[i].status === "fulfilled" ? responses[i].value : null }));
 
@@ -323,9 +331,7 @@
     const built = buildMatches(scoreResults, LEAGUES, namesMap);
     const newsSets = results.filter((r) => r.day === "news" && r.json);
     const news = await buildNews(newsSets, Object.fromEntries(LEAGUES.map((l) => [l.key, l.ar])), namesMap);
-    const standings = results.find((r) => r.day === "standings");
-    const leaders = results.find((r) => r.day === "leaders");
-    const stats = await buildStats(standings && standings.json ? standings.json : {}, leaders && leaders.json ? leaders.json : {}, built.teams, namesMap);
+    const stats = await statsFor("eng.1");
 
     const allEvents = [...built.matches.today, ...built.matches.yesterday, ...built.matches.tomorrow];
     const liveData = buildLive(built.matches.today, built.rawNames, namesMap);
@@ -423,5 +429,62 @@
     return { items: top, broadcasts: broadcasts };
   }
 
-  window.KORA_LIVE = { load: load, leagues: LEAGUES, commentary: commentary, translate: translateAll };
+  /* ---------- ترتيب وهدافين حسب البطولة ---------- */
+  async function egyptStats() {
+    const y = new Date().getFullYear();
+    const seasons = [y + "-" + (y + 1), (y - 1) + "-" + y];
+    let rows = [];
+    for (const season of seasons) {
+      try {
+        const j = await fetchJSON("https://www.thesportsdb.com/api/v1/json/123/lookuptable.php?l=4829&s=" + season);
+        if (j.table && j.table.length) {
+          rows = j.table.slice(0, 14).map((r, i) => ({
+            pos: Number(r.intRank || i + 1),
+            team: r.strTeam || "فريق",
+            code: (r.strTeamShort || r.strTeam || "؟").slice(0, 4).toUpperCase(),
+            c1: "#0f766e", c2: "#ffffff",
+            pts: Number(r.intPoints || 0), p: Number(r.intPlayed || 0),
+            w: Number(r.intWin || 0), d: Number(r.intDraw || 0), l: Number(r.intLoss || 0)
+          }));
+          break;
+        }
+      } catch (_) {}
+    }
+    const translated = rows.length ? await translateAll(rows.map((r) => r.team)) : [];
+    rows.forEach((r, i) => { r.team = translated[i] || r.team; });
+    return {
+      table: rows,
+      scorers: [],
+      note: "الهدافون غير متاحين من مصدر TheSportsDB المجاني — الترتيب من المصدر الرسمي المفتوح"
+    };
+  }
+
+  async function statsFor(leagueKey) {
+    const key = STATS_LEAGUES.some((l) => l.key === leagueKey) ? leagueKey : "eng.1";
+    if (statsCache.has(key)) return statsCache.get(key);
+    let result;
+    if (key === "egy") {
+      result = await egyptStats();
+    } else {
+      const y = new Date().getFullYear();
+      const urls = [
+        WEB + key + "/standings?region=us&lang=en&contentorigin=espn",
+        CORE + "leagues/" + key + "/seasons/" + y + "/types/1/leaders?lang=en&region=us"
+      ];
+      const rs = await Promise.allSettled(urls.map(fetchJSON));
+      const standings = rs[0].status === "fulfilled" ? rs[0].value : {};
+      let leaders = rs[1].status === "fulfilled" ? rs[1].value : {};
+      if (!leaders || !leaders.categories || !leaders.categories.length) {
+        try { leaders = await fetchJSON(CORE + "leagues/" + key + "/seasons/" + (y - 1) + "/types/1/leaders?lang=en&region=us"); } catch (_) {}
+      }
+      result = await buildStats(standings, leaders || {}, {}, new Map());
+    }
+    statsCache.set(key, result);
+    return result;
+  }
+
+  window.KORA_LIVE = {
+    load: load, leagues: LEAGUES, commentary: commentary, translate: translateAll,
+    stats: statsFor, statsLeagues: STATS_LEAGUES
+  };
 })();

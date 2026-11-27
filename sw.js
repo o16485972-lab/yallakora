@@ -21,12 +21,12 @@ if (FCM_SENDER) {
 /* Cloudflare Worker للإشعارات في الخلفية — يُمرَّر في رابط التسجيل */
 const WORKER_URL = FCM_Q.get("worker") || "";
 
-const CACHE = "kora-v29";
+const CACHE = "kora-v30";
 const SHELL = [
   "./", "./index.html", "./manifest.json", "./icon.svg",
-  "./css/styles.css?v=15", "./js/config.js?v=5", "./js/data.js?v=3",
-  "./js/streams.js", "./js/sources.js?v=2", "./js/live.js?v=3",
-  "./js/enrich.js?v=6", "./js/app.js?v=29"
+  "./css/styles.css?v=16", "./js/config.js?v=5", "./js/data.js?v=3",
+  "./js/streams.js", "./js/sources.js?v=2", "./js/live.js?v=4",
+  "./js/enrich.js?v=6", "./js/app.js?v=30"
 ];
 
 self.addEventListener("install", (e) => {

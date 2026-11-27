@@ -16,10 +16,14 @@
     newsFilter: "الكل",
     newsShown: 8,
     statsTab: "scorers",
+    statsLeague: "eng.1",
+    statsData: null,
+    statsLoading: false,
     showFavorites: false,
     liveMinute: 74,
     toastTimer: null
   };
+  state.statsData = (D && D.stats) || null;
 
   /* ================= الميزات الجديدة ================= */
   const CFG = window.KORA_CONFIG || {};
@@ -317,6 +321,16 @@
     }
   };
 
+  function applyTheme() {
+    const theme = store.get("theme", "light") === "dark" ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", theme);
+    const btn = document.getElementById("themeBtn");
+    if (btn) {
+      btn.textContent = theme === "dark" ? "☀️" : "🌙";
+      btn.setAttribute("aria-label", theme === "dark" ? "الوضع النهاري" : "الوضع الليلي");
+    }
+  }
+
   const getFavs = () => (store.get("favorites", []) || []).map(String);
   const isFav = (id) => getFavs().includes(String(id));
   const getComments = () => store.get("comments", []) || [];
@@ -450,8 +464,13 @@
       box.innerHTML = `<div class="search-empty">اكتب كلمة للبحث في الأخبار والفرق والمباريات</div>`;
       return;
     }
-    const newsRes = D.news.filter((n) => (n.title + n.category + n.excerpt).toLowerCase().includes(term)).slice(0, 8);
-    const teamRes = Object.values(D.teams).filter((t) => t.name.toLowerCase().includes(term)).slice(0, 6);
+    const nameOf = (id) => ((D.teams || {})[id] || {}).name || "فريق";
+    const newsRes = (D.news || []).filter((n) => (n.title + n.category + n.excerpt).toLowerCase().includes(term)).slice(0, 8);
+    const teamRes = Object.entries(D.teams || {}).filter(([, t]) => (t.name || "").toLowerCase().includes(term)).slice(0, 6);
+    const matchRes = ["yesterday", "today", "tomorrow"]
+      .flatMap((d) => ((D.matches || {})[d] || []))
+      .filter((m) => (nameOf(m.home) + " " + nameOf(m.away) + " " + (m.league || "")).toLowerCase().includes(term))
+      .slice(0, 5);
     const html = [];
     if (newsRes.length) {
       html.push(`<div style="padding:6px 10px;font-size:11px;font-weight:800;color:var(--muted)">الأخبار</div>`);
@@ -463,9 +482,17 @@
     }
     if (teamRes.length) {
       html.push(`<div style="padding:10px 10px 6px;font-size:11px;font-weight:800;color:var(--muted)">الفرق</div>`);
-      teamRes.forEach((t) => html.push(`
-        <div class="search-result" data-action="team" data-name="${esc(t.name)}">
+      teamRes.forEach(([id, t]) => html.push(`
+        <div class="search-result" data-action="team" data-id="${esc(id)}" data-name="${esc(t.name)}">
           ${badge(t)}<div><small>فريق</small><h4>${esc(t.name)}</h4></div>
+        </div>`));
+    }
+    if (matchRes.length) {
+      html.push(`<div style="padding:10px 10px 6px;font-size:11px;font-weight:800;color:var(--muted)">المباريات</div>`);
+      matchRes.forEach((m) => html.push(`
+        <div class="search-result" data-action="match" data-id="${esc(m.id)}">
+          <span class="team-badge" style="--c1:#0e7490;--c2:#fff">⚽</span>
+          <div><small>${esc(m.league)} · ${esc(matchTime(m))}</small><h4>${esc(nameOf(m.home))} × ${esc(nameOf(m.away))}</h4></div>
         </div>`));
     }
     box.innerHTML = html.join("") || `<div class="search-empty">لا توجد نتائج مطابقة لـ «${esc(q)}»</div>`;
@@ -586,30 +613,36 @@
 
   function statsHTML() {
     const tabs = [["scorers", "الهدافون"], ["table", "ترتيب الفرق"], ["upcoming", "المباريات القادمة"]];
+    const data = state.statsData || D.stats || { table: [], scorers: [], upcoming: [] };
+    const leagues = (window.KORA_LIVE && window.KORA_LIVE.statsLeagues) || [];
+    const leagueBar = leagues.length ? `<div class="filter-bar stat-league-bar">${leagues.map((l) => `<button class="filter-btn ${state.statsLeague === l.key ? "active" : ""}" data-action="stats-league" data-key="${l.key}">${esc(l.label)}</button>`).join("")}</div>` : "";
     let body = "";
-    if (state.statsTab === "scorers") {
-      body = D.stats.scorers.map((s, i) => `<div class="rank-row">
+    if (state.statsLoading) {
+      body = `<div class="rank-row"><span class="rank-name">جارٍ تحميل ترتيب البطولة…</span></div>`;
+    } else if (state.statsTab === "scorers") {
+      body = (data.scorers || []).length ? data.scorers.map((s, i) => `<div class="rank-row">
         <span class="rank-num">${i + 1}</span>
         <span class="team-badge" style="--c1:${s.c1};--c2:${s.c2}">${esc(s.code)}</span>
         <span class="rank-name">${esc(s.name)}<small>${esc(s.team)}</small></span>
         <span class="rank-val">${s.goals}</span>
-      </div>`).join("");
+      </div>`).join("") : `<p class="modal-note">${esc(data.note || "لا تتوفر قائمة هدافين لهذه البطولة من المصادر المجانية حالياً.")}</p>`;
     } else if (state.statsTab === "table") {
-      body = `<div class="table-scroll"><table class="mini-table">
+      body = (data.table || []).length ? `<div class="table-scroll"><table class="mini-table">
         <thead><tr><th>#</th><th>الفريق</th><th>لعب</th><th>ف</th><th>ت</th><th>خ</th><th>نقاط</th></tr></thead>
-        <tbody>${D.stats.table.map((t) => `<tr>
+        <tbody>${data.table.map((t) => `<tr>
           <td>${t.pos}</td>
           <td><span class="team-cell">${badge(t)} ${esc(t.team)}</span></td>
           <td>${t.p}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td><td><b>${t.pts}</b></td>
-        </tr>`).join("")}</tbody></table></div>`;
+        </tr>`).join("")}</tbody></table></div>` : `<p class="modal-note">تعذّر تحميل الترتيب، سيظهر مرة أخرى عند توفر المصدر.</p>`;
     } else {
-      body = D.stats.upcoming.map((u) => `<div class="upcoming-row">
+      body = (data.upcoming || []).map((u) => `<div class="upcoming-row">
         <span class="tm"><span class="team-badge" style="--c1:${u.hc};--c2:#fff">${esc(u.home.charAt(0))}</span>${esc(u.home)}</span>
         <span class="when">${esc(cityTime(u.iso, u.time))}</span>
         <span class="tm"><span class="team-badge" style="--c1:${u.ac};--c2:#fff">${esc(u.away.charAt(0))}</span>${esc(u.away)}</span>
       </div>`).join("");
     }
     return `<div class="stats-panel" id="statsPanel">
+      ${leagueBar}
       <div class="panel-tabs">${tabs.map((t) => `<button class="panel-tab ${state.statsTab === t[0] ? "active" : ""}" data-action="stats-tab" data-tab="${t[0]}">${t[1]}</button>`).join("")}</div>
       <div class="panel-body">${body}</div>
     </div>`;
@@ -977,6 +1010,12 @@
           <p>${esc(levelInfo().badge)} <b>${esc(levelInfo().name)}</b> — ${levelInfo().points} نقطة${levelInfo().next ? " · المتبقي للمستوى التالي: " + (levelInfo().next - levelInfo().points) : " · أعلى مستوى!"}</p>
           <a class="source-link" href="#/profile">عرض ملفي الكامل ↗</a>
         </div>
+        <div class="card settings-card">
+          <h3>🎨 مظهر الموقع</h3>
+          <p>الوضع الحالي: <b>${esc(document.documentElement.getAttribute("data-theme") === "dark" ? "ليلي 🌙" : "نهاري ☀️")}</b></p>
+          <p class="modal-note">اختر الوضع المريح لعينك؛ سيُحفظ على جهازك تلقائياً.</p>
+          <button class="source-link" data-action="theme-toggle">${document.documentElement.getAttribute("data-theme") === "dark" ? "التبديل للوضع النهاري ☀️" : "التبديل للوضع الليلي 🌙"}</button>
+        </div>
       </div></section>`;
   }
 
@@ -1216,6 +1255,7 @@
           <div class="article-meta"><span>✍️ فريق التحرير</span><span>📅 ${esc(n.date)}</span><span>🕒 ${esc(n.time)}</span><span>👁 ${num(n.views)} مشاهدة</span></div>
           ${n.body.map((p) => `<p>${esc(p)}</p>`).join("")}
           ${n.link ? `<a class="source-link" href="${esc(n.link)}" target="_blank" rel="noopener">اقرأ المقال الأصلي في المصدر ↗</a>` : ""}
+          <div class="article-tools"><button class="vote-btn speak-btn" data-action="speak">🔊 استمع للخبر</button><button class="vote-btn" data-action="webshare">🔗 مشاركة سريعة</button></div>
           <div class="article-share"><span>مشاركة:</span>${share.map((s) => `<a href="${s[1]}" target="_blank" rel="noopener">${s[0]}</a>`).join("")}</div>
           <section class="article-comments"><h3>آراء القرّاء</h3>${commentsHTML("news_" + n.id)}</section>
           ${adSlotHTML("article")}
@@ -1261,12 +1301,21 @@
 
   function renderSearchPage(query) {
     const q = query.get("q") || "";
-    const term = q.toLowerCase();
-    const res = D.news.filter((n) => (n.title + n.category + n.excerpt).toLowerCase().includes(term));
+    const term = q.trim().toLowerCase();
+    const nameOf = (id) => ((D.teams || {})[id] || {}).name || "";
+    const res = (D.news || []).filter((n) => (n.title + n.category + n.excerpt).toLowerCase().includes(term));
+    const teams = Object.entries(D.teams || {}).filter(([, t]) => String(t.name || "").toLowerCase().includes(term));
+    const matches = ["yesterday", "today", "tomorrow"]
+      .flatMap((d) => ((D.matches || {})[d] || []))
+      .filter((m) => (nameOf(m.home) + " " + nameOf(m.away) + " " + (m.league || "")).toLowerCase().includes(term));
+    const total = res.length + teams.length + matches.length;
     view.innerHTML = `
       <div class="page-head"><div class="breadcrumb"><a href="#/">الرئيسية</a> ‹ <span>البحث</span></div>
-        <h1>نتائج البحث عن «${esc(q)}»</h1><p>تم العثور على ${res.length} نتيجة</p></div>
-      <div class="news-list">${res.map(newsRow).join("") || `<div class="empty-state card"><span class="emoji">🔍</span>لم نجد نتائج مطابقة</div>`}</div>`;
+        <h1>نتائج البحث عن «${esc(q)}»</h1><p>تم العثور على ${total} نتيجة</p></div>
+      ${teams.length ? `<section class="section"><h2 class="search-section-title">الفرق (${teams.length})</h2><div class="league-grid">${teams.slice(0, 8).map(([id, team]) => `<div class="card league-card" data-action="team" data-id="${esc(id)}" data-name="${esc(team.name)}">${badge(team)}<div><h4>${esc(team.name)}</h4><small>${esc(team.code || "فريق")}</small></div></div>`).join("")}</div></section>` : ""}
+      ${matches.length ? `<section class="section"><h2 class="search-section-title">المباريات (${matches.length})</h2><div class="strip-scroll">${matches.slice(0, 10).map(matchCard).join("")}</div></section>` : ""}
+      <section class="section"><h2 class="search-section-title">الأخبار (${res.length})</h2>
+        <div class="news-list">${res.map(newsRow).join("") || `<div class="empty-state card"><span class="emoji">🔍</span>لم نجد نتائج مطابقة</div>`}</div></section>`;
   }
 
   function renderSimplePage(key) {
@@ -1479,6 +1528,12 @@
         <button class="follow-btn ${isFav(m.home) ? "active" : ""}" data-action="follow-team" data-id="${esc(m.home)}" data-name="${esc(h.name)}">${isFav(m.home) ? "⭐ متابَع" : "☆ متابعة"} ${esc(h.code)}</button>
         <button class="follow-btn ${isFav(m.away) ? "active" : ""}" data-action="follow-team" data-id="${esc(m.away)}" data-name="${esc(a.name)}">${isFav(m.away) ? "⭐ متابَع" : "☆ متابعة"} ${esc(a.code)}</button>
       </div>
+      <div class="match-tools">
+        <button class="vote-btn" data-action="ics" data-id="${esc(m.id)}">📅 أضف إلى تقويمي</button>
+        <button class="vote-btn" data-action="card" data-id="${esc(m.id)}">🖼 بطاقة للمشاركة</button>
+        <button class="vote-btn" data-action="webshare">🔗 مشاركة</button>
+      </div>
+      <div class="match-team-links"><a data-action="modal-nav" href="#/team/${esc(m.home)}">صفحة ${esc(h.code)} ↗</a><a data-action="modal-nav" href="#/team/${esc(m.away)}">صفحة ${esc(a.code)} ↗</a></div>
       <button class="vote-btn" data-action="rate-player" style="margin-top:14px">اختر رجل المباراة</button>
       ${m.link ? `<a class="vote-btn" style="display:block;text-align:center;margin-top:10px;text-decoration:none" href="${esc(m.link)}" target="_blank" rel="noopener">المشاهدة الرسمية / المصدر ↗</a>` : `<p class="modal-note" style="margin-top:10px">المشاهدة الكاملة تخضع لحقوق النقل.</p>`}
       <a class="source-link" style="margin-top:10px" href="#/broadcasters" data-action="goto-broadcasters">📺 دليل الناقلين الرسميين — من يملك حقوق هذه البطولة؟</a>`;
@@ -1563,6 +1618,118 @@
   }
 
   /* ---------- شريط الدوريات السريع + لوحة النتائج (مقارنة بالموقعات العالمية) ---------- */
+  /* ---------- ميزات إضافية: تقويم، بطاقة مشاركة، استماع، صفحة فريق ---------- */
+  function downloadICS(id) {
+    const m = findMatch(id);
+    if (!m || !m.iso || isNaN(Date.parse(m.iso))) { toast("الموعد غير معروف لإضافته للتقويم"); return; }
+    const h = ((D.teams[m.home] || {}).name) || "الفريق الأول";
+    const a = ((D.teams[m.away] || {}).name) || "الفريق الثاني";
+    const fmt = (d) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    const clean = (s) => String(s).replace(/\\/g, "\\\\").replace(/,/g, "\\,").replace(/;/g, "\\;").replace(/\r?\n/g, "\\n");
+    const start = new Date(m.iso);
+    const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+    const ics = [
+      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//yallaakora//AR", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+      "BEGIN:VEVENT", "UID:" + String(m.id || "match").replace(/[^\w-]/g, "") + "@yallaakora",
+      "DTSTAMP:" + fmt(new Date()), "DTSTART:" + fmt(start), "DTEND:" + fmt(end),
+      "SUMMARY:" + clean(h + " × " + a),
+      "DESCRIPTION:" + clean(String(m.league || "") + " — أضيفت من yallaakora"),
+      "LOCATION:" + clean(m.league || ""), "END:VEVENT", "END:VCALENDAR"
+    ].join("\r\n");
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "yallaakora-" + String(m.id || "match").replace(/[^\w-]/g, "") + ".ics";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 2000);
+    toast("تم تنزيل المباراة إلى التقويم 📅");
+    award(3, "إضافة مباراة للتقويم");
+  }
+
+  function shareMatchCard(id) {
+    const m = findMatch(id);
+    if (!m) { toast("تعذّر إنشاء البطاقة"); return; }
+    const h = ((D.teams[m.home] || {}).name) || "الفريق الأول";
+    const a = ((D.teams[m.away] || {}).name) || "الفريق الثاني";
+    const c = document.createElement("canvas"); c.width = 720; c.height = 400;
+    const x = c.getContext("2d");
+    const g = x.createLinearGradient(0, 0, 720, 400);
+    g.addColorStop(0, "#0f172a"); g.addColorStop(1, "#0e7490");
+    x.fillStyle = g; x.fillRect(0, 0, 720, 400);
+    x.direction = "rtl"; x.textAlign = "right";
+    x.fillStyle = "#67e8f9"; x.font = "bold 24px Cairo, Arial";
+    x.fillText("yallaakora ⚽", 680, 54);
+    x.fillStyle = "#ffffff"; x.font = "bold 22px Cairo, Arial";
+    x.fillText(String(m.league || ""), 680, 96);
+    x.font = "bold 42px Cairo, Arial";
+    x.fillText(h, 680, 180);
+    x.fillText(a, 680, 240);
+    x.fillStyle = "#5eead4"; x.font = "bold 70px Arial"; x.textAlign = "center";
+    x.fillText((m.hs === "-" ? "–" : m.hs) + "  :  " + (m.as === "-" ? "–" : m.as), 360, 225);
+    x.fillStyle = "#cbd5e1"; x.font = "20px Cairo, Arial"; x.textAlign = "right";
+    x.fillText(matchTime(m) + " · " + getCity().label, 680, 330);
+    x.fillText("yallakora.mooo.com", 680, 370);
+    const link = document.createElement("a");
+    link.href = c.toDataURL("image/png");
+    link.download = "yallaakora-card-" + String(m.id || "match").replace(/[^\w-]/g, "") + ".png";
+    link.click();
+    toast("تم إنشاء بطاقة المباراة 🖼");
+    award(3, "مشاركة بطاقة مباراة");
+  }
+
+  let speakingEl = null;
+  function speakText(text, btn) {
+    if (!("speechSynthesis" in window)) { toast("متصفحك لا يدعم القراءة الصوتية"); return; }
+    if (speakingEl) {
+      window.speechSynthesis.cancel(); speakingEl = null;
+      document.querySelectorAll("[data-action='speak']").forEach((b) => { b.textContent = "🔊 استمع للخبر"; });
+      return;
+    }
+    const clean = String(text || "").replace(/([.!?؟])\s+/g, "$1\n").split("\n").filter((s) => s.trim()).slice(0, 10).join(" ");
+    if (!clean.trim()) { toast("لا يوجد نص لقراءته"); return; }
+    const u = new SpeechSynthesisUtterance(clean.slice(0, 1800));
+    const voices = window.speechSynthesis.getVoices() || [];
+    u.voice = voices.find((v) => /^ar/i.test(v.lang)) || voices.find((v) => /ar/i.test(v.lang)) || null;
+    u.lang = u.voice ? u.voice.lang : "ar-SA";
+    u.rate = 0.95;
+    const reset = () => { speakingEl = null; if (btn) btn.textContent = "🔊 استمع للخبر"; };
+    u.onend = reset; u.onerror = reset;
+    speakingEl = btn || document.body;
+    if (btn) btn.textContent = "⏹ إيقاف الاستماع";
+    window.speechSynthesis.speak(u);
+  }
+
+  function renderTeamPage(id) {
+    const key = String(id || "");
+    const entry = Object.entries(D.teams || {}).find(([k, t]) => k === key || t.name === key || t.rawName === key);
+    if (!entry) {
+      view.innerHTML = `<div class="page-head"><h1>الفريق غير موجود</h1><p class="modal-note">لم نجد هذا الفريق في البيانات الحالية.</p></div>`;
+      return;
+    }
+    const teamId = entry[0], team = entry[1], name = team.name || "فريق";
+    const matches = ["yesterday", "today", "tomorrow"]
+      .flatMap((d) => ((D.matches || {})[d] || []).filter((m) => String(m.home) === teamId || String(m.away) === teamId))
+      .sort((a, b) => String(a.iso || "").localeCompare(String(b.iso || "")));
+    const row = ((state.statsData || D.stats || {}).table || []).find((r) => r.team === name || r.code === team.code);
+    const news = (D.news || []).filter((n) => (n.title + " " + n.excerpt).toLowerCase().includes(name.toLowerCase())).slice(0, 6);
+    setSEO({ title: name + " — الفريق", desc: "مباريات ونتائج وأخبار فريق " + name + " على yallaakora", schema: { "@context": "https://schema.org", "@type": "SportsTeam", name: name, url: location.href } });
+    view.innerHTML = `
+      <div class="breadcrumb"><a href="#/">الرئيسية</a> ‹ <a href="#/matches">المباريات</a> ‹ <span>${esc(name)}</span></div>
+      <div class="page-head team-hero">
+        ${badge(team)}
+        <div><h1>${esc(name)}</h1><p class="modal-note">${esc(team.code || "")} · متابعة الفريق تُنبهك قبل مبارياته</p></div>
+        <button class="follow-btn ${isFav(teamId) ? "active" : ""}" data-action="follow-team" data-id="${esc(teamId)}" data-name="${esc(name)}">${isFav(teamId) ? "⭐ متابَع" : "☆ متابعة"}</button>
+      </div>
+      ${row ? `<section class="section"><div class="card" style="padding:12px;display:flex;gap:18px;flex-wrap:wrap"><b>المركز: ${row.pos}</b><span>نقاط: ${row.pts}</span><span>لعب: ${row.p}</span><span>فوز: ${row.w}</span><span>تعادل: ${row.d}</span><span>خسارة: ${row.l}</span></div></section>` : ""}
+      <section class="section">${sectionHead("مباريات الفريق", "#/matches")}
+        ${matches.length ? `<div class="strip-scroll">${matches.map(matchCard).join("")}</div>` : `<p class="modal-note">لا توجد مباريات مسجلة لهذا الفريق في البيانات الحالية.</p>`}
+      </section>
+      <section class="section">${sectionHead("أخبار الفريق", "#/news")}
+        ${news.length ? `<div class="news-grid">${news.map(newsCard).join("")}</div>` : `<p class="modal-note">لا توجد أخبار مطابقة لهذا الفريق حالياً.</p>`}
+      </section>`;
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }
+
   function renderLeagueTabs() {
     const el = document.getElementById("leagueTabs");
     if (!el) return;
@@ -1604,7 +1771,7 @@
     const a = t.dataset.action;
 
     if (a === "article") { location.hash = "#/news/" + t.dataset.id; closeSearch(); return; }
-    if (a === "team") { closeSearch(); toast("صفحة الفريق: " + t.dataset.name + " (قريباً)"); return; }
+    if (a === "team") { closeSearch(); location.hash = "#/team/" + encodeURIComponent(t.dataset.id || t.dataset.name || ""); return; }
     if (a === "league") { location.hash = "#/leagues?league=" + encodeURIComponent(t.dataset.name); return; }
     if (a === "match") { showMatch(t.dataset.id); return; }
     if (a === "video") { showVideo(t.dataset.title, t.dataset.image); return; }
@@ -1702,6 +1869,15 @@
       return;
     }
     if (a === "modal-close") { closeModal(); return; }
+    if (a === "modal-nav") { e.preventDefault(); closeModal(); location.hash = t.getAttribute("href"); return; }
+    if (a === "theme-toggle") {
+      const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      store.set("theme", next);
+      applyTheme();
+      toast(next === "dark" ? "تم تفعيل الوضع الليلي 🌙" : "تم تفعيل الوضع النهاري ☀️");
+      if (location.hash === "#/settings") renderSettingsPage();
+      return;
+    }
     if (a === "open-settings") { location.hash = "#/settings"; return; }
     if (a === "notify-toggle") {
       if (!("Notification" in window)) { toast("متصفحك لا يدعم الإشعارات"); return; }
@@ -1845,6 +2021,40 @@
       if (panel) panel.outerHTML = statsHTML();
       return;
     }
+    if (a === "stats-league") {
+      state.statsLeague = t.dataset.key;
+      state.statsLoading = true;
+      let panel = document.getElementById("statsPanel");
+      if (panel) panel.outerHTML = statsHTML();
+      try {
+        if (window.KORA_LIVE && window.KORA_LIVE.stats) {
+          const s = await window.KORA_LIVE.stats(state.statsLeague);
+          state.statsData = { ...s, upcoming: (state.statsData || D.stats || {}).upcoming || [] };
+        }
+      } catch (_) { toast("تعذّر تحميل ترتيب هذه البطولة"); }
+      state.statsLoading = false;
+      panel = document.getElementById("statsPanel");
+      if (panel) panel.outerHTML = statsHTML();
+      return;
+    }
+    if (a === "ics") { downloadICS(t.dataset.id); return; }
+    if (a === "card") { shareMatchCard(t.dataset.id); return; }
+    if (a === "speak") {
+      const text = document.querySelector(".article-content")?.innerText || document.getElementById("view")?.innerText || "";
+      speakText(text, t);
+      return;
+    }
+    if (a === "webshare") {
+      const title = document.title;
+      const url = location.href;
+      if (navigator.share) {
+        try { await navigator.share({ title: title, text: title, url: url }); } catch (_) {}
+      } else {
+        try { await navigator.clipboard.writeText(url); toast("تم نسخ رابط الصفحة"); }
+        catch (_) { toast("تعذّر نسخ الرابط"); }
+      }
+      return;
+    }
     if (a === "news-filter") {
       state.newsShown = 8;
       const qs = "cat=" + encodeURIComponent(t.dataset.cat);
@@ -1893,7 +2103,8 @@
       broadcasters: ["الناقلون الرسميون", "دليل حقوق بث البطولات في الشرق الأوسط وشمال أفريقيا."],
       settings: ["الإعدادات والإشعارات", "اضبط توقيت المباريات والإشعارات حسب مدينتك."],
       profile: ["ملفي ونقاطي", "مستواك ونقاطك وتفاعلك مع yallaakora."],
-      admin: ["لوحة التحكم", "حالة المصادر والإعدادات المحلية لـ yallaakora."]
+      admin: ["لوحة التحكم", "حالة المصادر والإعدادات المحلية لـ yallaakora."],
+      team: ["صفحة الفريق", "مباريات ونتائج وأخبار الفريق المختار."]
     };
     const seo = SEO_PAGES[key] || [];
     setSEO({ title: seo[0] || "", desc: seo[1] });
@@ -1913,6 +2124,7 @@
     else if (key === "settings") renderSettingsPage();
     else if (key === "profile") renderProfilePage();
     else if (key === "admin") renderAdminPage();
+    else if (key === "team") renderTeamPage(parts[1]);
     else renderSimplePage(key);
 
     if (location.hash !== "#/") window.scrollTo({ top: 0, behavior: "auto" });
@@ -1929,6 +2141,8 @@
         try { data = await window.KORA_ENRICH.load(data); } catch (err) { console.warn("Enrichment unavailable:", err); }
       }
       D = data;
+      state.statsData = D.stats;
+      state.statsLeague = "eng.1";
       renderLeagueTabs();
       renderScoreTicker();
       route();
@@ -1957,6 +2171,7 @@
   fcmState = fcmToken ? "ready" : "off";
   webpushState = store.get("webpush_on", false) ? "ready" : "off";
   initChrome();
+  applyTheme();
   renderLeagueTabs();
   renderScoreTicker();
   if (!location.hash) location.hash = "#/";

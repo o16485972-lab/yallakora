@@ -1,0 +1,20 @@
+{
+  "name": "yallaakora — أخبار ومباريات كرة القدم",
+  "short_name": "yallaakora",
+  "description": "أخبار ونتائج ومباريات كرة القدم بالعربية من مصادر عامة وقانونية.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3f5f8",
+  "theme_color": "#0f172a",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "المباريات", "url": "/matches" },
+    { "name": "الأخبار", "url": "/news" },
+    { "name": "المصادر القانونية", "url": "/sources" }
+  ]
+}

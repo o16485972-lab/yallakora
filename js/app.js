@@ -1978,17 +1978,6 @@
       if (worker) q.set("worker", worker);
       const swUrl = "./sw.js" + (q.toString() ? "?" + q.toString() : "");
 
-      /* أول تثبيت للـ Service Worker: إعادة تحميل واحدة لتبدأ نسخة Next داخل نفس الدومين */
-      let nextReloaded = false;
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        const bypass = new URLSearchParams(location.search).has("static");
-        if (!bypass && !nextReloaded && !sessionStorage.getItem("kora-next-ready")) {
-          nextReloaded = true;
-          sessionStorage.setItem("kora-next-ready", "1");
-          location.reload();
-        }
-      });
-
       navigator.serviceWorker.register(swUrl)
         .then(() => { if (worker) initWebPush(); else if (fcmConfigured()) initFCM(); })
         .catch(() => {});

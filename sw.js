@@ -21,50 +21,13 @@ if (FCM_SENDER) {
 /* Cloudflare Worker للإشعارات في الخلفية — يُمرَّر في رابط التسجيل */
 const WORKER_URL = FCM_Q.get("worker") || "";
 
-/* تطبيق Next.js يُقدَّم داخل نفس النطاق عبر هذا الـ Service Worker */
-const NEXT_ORIGIN = "https://yallaakora.pages.dev";
-const BYPASS_PARAM = "static";
-const STATIC_PATHS = ["/sw.js", "/manifest.json", "/icon.svg", "/ads.txt", "/robots.txt", "/sitemap.xml"];
-const STATIC_PREFIXES = ["/css/", "/js/"];
-
-const CACHE = "kora-v28";
+const CACHE = "kora-v29";
 const SHELL = [
   "./", "./index.html", "./manifest.json", "./icon.svg",
   "./css/styles.css?v=15", "./js/config.js?v=5", "./js/data.js?v=3",
   "./js/streams.js", "./js/sources.js?v=2", "./js/live.js?v=3",
-  "./js/enrich.js?v=6", "./js/app.js?v=28"
+  "./js/enrich.js?v=6", "./js/app.js?v=29"
 ];
-
-function shouldProxy(url) {
-  if (url.origin !== self.location.origin) return false;
-  if (url.searchParams.has(BYPASS_PARAM)) return false;
-  if (STATIC_PATHS.includes(url.pathname)) return false;
-  if (STATIC_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) return false;
-  return true;
-}
-
-async function proxyNext(request) {
-  if (!["GET", "HEAD"].includes(request.method)) {
-    return new Response("Method Not Allowed", { status: 405, headers: { allow: "GET, HEAD" } });
-  }
-  const target = new URL(NEXT_ORIGIN + request.url.slice(self.location.origin.length));
-  const headers = new Headers(request.headers);
-  headers.delete("host");
-  try {
-    const res = await fetch(new Request(target.toString(), {
-      method: request.method,
-      headers,
-      redirect: "manual",
-      cache: "no-store"
-    }));
-    return new Response(res.body, res);
-  } catch (err) {
-    return new Response("تعذّر تحميل النسخة الجديدة، جرّب تحديث الصفحة.", {
-      status: 502,
-      headers: { "content-type": "text/plain; charset=utf-8" }
-    });
-  }
-}
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE)
@@ -83,12 +46,6 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET" && e.request.method !== "HEAD") return;
   const url = new URL(e.request.url);
-
-  /* نسخة Next داخل نفس الدومين — كل المسارات عدا ملفات الموقع الثابت */
-  if (shouldProxy(url)) {
-    e.respondWith(proxyNext(e.request));
-    return;
-  }
 
   if (url.origin !== self.location.origin) return; // لا نخزن بيانات ESPN/يوتيوب
 

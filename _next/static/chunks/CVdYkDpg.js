@@ -1,2 +1,0 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["_next/static/chunks/DiKaV_3M.js","_next/static/chunks/CcyWYbDU.js","_next/static/chunks/BYinrRBU.js","_next/static/chunks/B0PXqnjO.js","_next/static/chunks/CLWZsZ0S.js","_next/static/chunks/pkzU8aeZ.js"])))=>i.map(i=>d[i]);
-import{B as e}from"./BYinrRBU.js";var t=[()=>e(()=>import(`./DiKaV_3M.js`),__vite__mapDeps([0,1,2,3])),()=>e(()=>import(`./CLWZsZ0S.js`),__vite__mapDeps([4,1,2,3])),()=>e(()=>import(`./pkzU8aeZ.js`),__vite__mapDeps([5,1,2,3]))];export{t as default};
